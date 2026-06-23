@@ -1,0 +1,464 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/features/business/domain/entities/business.dart';
+import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
+import 'package:bonvo/injection/injection.dart';
+
+class ClientListPage extends StatefulWidget {
+  final String businessId;
+  final String businessName;
+
+  const ClientListPage({
+    super.key,
+    required this.businessId,
+    this.businessName = '',
+  });
+
+  @override
+  State<ClientListPage> createState() => _ClientListPageState();
+}
+
+class _ClientListPageState extends State<ClientListPage> {
+  List<ClientSummary> _clients = [];
+  bool _loading = true;
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final result = await getIt<BusinessRepository>()
+        .getBusinessClients(widget.businessId);
+    result.fold((_) {}, (list) => setState(() => _clients = list));
+    setState(() => _loading = false);
+  }
+
+  List<ClientSummary> get _filtered {
+    if (_search.isEmpty) return _clients;
+    final q = _search.toLowerCase();
+    return _clients
+        .where((c) => c.name.toLowerCase().contains(q))
+        .toList();
+  }
+
+  static const _avatarColors = [
+    Color(0xFF10B981),
+    Color(0xFFF59E0B),
+    Color(0xFF6366F1),
+    Color(0xFFEF4444),
+    Color(0xFF8B5CF6),
+  ];
+
+  static String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  static String _lastVisit(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays == 0) return 'hoy';
+    if (diff.inDays == 1) return 'ayer';
+    if (diff.inDays < 7) return 'hace ${diff.inDays} días';
+    if (diff.inDays < 14) return 'hace 1 sem';
+    if (diff.inDays < 30) {
+      return 'hace ${(diff.inDays / 7).floor()} sem';
+    }
+    final months = (diff.inDays / 30).floor();
+    return months == 1 ? 'hace 1 mes' : 'hace $months meses';
+  }
+
+  static String _fmtPts(int v) {
+    if (v >= 1000) {
+      return '${v ~/ 1000},${(v % 1000).toString().padLeft(3, '0')}';
+    }
+    return '$v';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.primary,
+        elevation: 4,
+        shape: const CircleBorder(),
+        onPressed: () => context.push('/business/scanner'),
+        child: const Icon(AppIcons.scanner,
+            color: Colors.white, size: 28),
+      ),
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: _BottomBar(
+        onInicio: () => context.go('/business/home'),
+        onPromos: () => context.push('/business/promotions', extra: {
+          'businessId': widget.businessId,
+          'businessName': widget.businessName,
+        }),
+        onPerfil: () {},
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header ──
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Clientes',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (_clients.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.greenTint,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_clients.length} activos',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Buscador ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              onChanged: (v) => setState(() => _search = v),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(AppIcons.search,
+                    size: 20, color: AppColors.textMuted),
+                hintText: 'Buscar cliente...',
+                fillColor: AppColors.background,
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: AppColors.primary, width: 1.5),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+
+          // ── Lista ──
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : filtered.isEmpty
+                    ? _EmptyState(searching: _search.isNotEmpty)
+                    : ListView.separated(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final c = filtered[i];
+                          final color = _avatarColors[
+                              c.name.hashCode.abs() %
+                                  _avatarColors.length];
+                          return _ClientTile(
+                            name: c.name,
+                            initials: _initials(c.name),
+                            lastVisitLabel: _lastVisit(c.lastVisit),
+                            pts: _fmtPts(c.transactionCount),
+                            color: color,
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+class _ClientTile extends StatelessWidget {
+  final String name;
+  final String initials;
+  final String lastVisitLabel;
+  final String pts;
+  final Color color;
+
+  const _ClientTile({
+    required this.name,
+    required this.initials,
+    required this.lastVisitLabel,
+    required this.pts,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          // Avatar circular
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: color,
+            child: Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Nombre + última visita
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Última visita: $lastVisitLabel',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Puntos
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                pts,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  height: 1.1,
+                ),
+              ),
+              const Text(
+                'PTS',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final bool searching;
+  const _EmptyState({required this.searching});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: const BoxDecoration(
+              color: AppColors.greenTint,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              searching
+                  ? AppIcons.searchOff
+                  : AppIcons.clients,
+              size: 40,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            searching
+                ? 'Sin resultados'
+                : 'Aún no tienes clientes',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            searching
+                ? 'Prueba con otro nombre'
+                : 'Comienza acreditando puntos\npara que aparezcan aquí',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+class _BottomBar extends StatelessWidget {
+  final VoidCallback onInicio;
+  final VoidCallback onPromos;
+  final VoidCallback onPerfil;
+
+  const _BottomBar({
+    required this.onInicio,
+    required this.onPromos,
+    required this.onPerfil,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomAppBar(
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8,
+      color: Colors.white,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: SizedBox(
+        height: 60,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(
+              icon: AppIcons.dashboard,
+              label: 'Inicio',
+              onTap: onInicio,
+            ),
+            _NavItem(
+              icon: AppIcons.clients,
+              label: 'Clientes',
+              active: true,
+              onTap: () {},
+            ),
+            const SizedBox(width: 56),
+            _NavItem(
+              icon: AppIcons.promotions,
+              label: 'Promos',
+              onTap: onPromos,
+            ),
+            _NavItem(
+              icon: AppIcons.profile,
+              label: 'Perfil',
+              onTap: onPerfil,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.primary : AppColors.textMuted;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 60,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

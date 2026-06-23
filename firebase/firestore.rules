@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isClient() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).exists();
+    }
+
+    function isBusinessAdmin(businessId) {
+      return isAuthenticated() && get(/databases/$(database)/documents/businesses/$(businessId)).data.adminUid == request.auth.uid;
+    }
+
+    function isEmployee(businessId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.businessId == businessId;
+    }
+
+    match /users/{userId} {
+      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /businesses/{businessId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isBusinessAdmin(businessId);
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated() && (request.auth.uid == employeeId || isBusinessAdmin(resource.data.businessId));
+      allow create: if isBusinessAdmin(request.resource.data.businessId);
+      allow update, delete: if isBusinessAdmin(resource.data.businessId);
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isBusinessAdmin(resource.data.businessId) || isEmployee(resource.data.businessId));
+      allow create: if isAuthenticated() &&
+        ((request.resource.data.userId == request.auth.uid && request.resource.data.type in ['earn', 'redeem']) ||
+        isBusinessAdmin(request.resource.data.businessId) ||
+        isEmployee(request.resource.data.businessId));
+      allow update, delete: if false;
+    }
+
+    match /promotions/{promotionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBusinessAdmin(request.resource.data.businessId);
+    }
+
+    match /qr_codes/{qrId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBusinessAdmin(request.resource.data.businessId) || isEmployee(request.resource.data.businessId);
+    }
+  }
+}
