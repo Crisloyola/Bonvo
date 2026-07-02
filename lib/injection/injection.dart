@@ -18,6 +18,7 @@ import 'package:bonvo/features/business/domain/repositories/business_repository.
 import 'package:bonvo/features/business/domain/usecases/create_business.dart';
 import 'package:bonvo/features/business/domain/usecases/get_business_stats.dart';
 import 'package:bonvo/core/services/fcm_service.dart';
+import 'package:bonvo/core/services/notification_service.dart';
 import 'package:bonvo/core/services/proximity_service.dart';
 import 'package:bonvo/features/points/data/datasources/points_remote_datasource.dart';
 import 'package:bonvo/features/points/data/repositories/points_repository_impl.dart';
@@ -102,6 +103,7 @@ Future<void> configureDependencies() async {
   // --- Proximity & notifications ---
   getIt.registerLazySingleton<ProximityService>(() => ProximityService());
   getIt.registerLazySingleton<FcmService>(() => FcmService());
+  getIt.registerLazySingleton<NotificationService>(() => NotificationService());
 
   // --- Enroll use case (usa Firestore directamente) ---
   getIt.registerLazySingleton(

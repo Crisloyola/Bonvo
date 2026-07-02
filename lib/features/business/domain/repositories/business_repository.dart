@@ -27,4 +27,9 @@ abstract class BusinessRepository {
     required String businessId,
     required String bannerBase64,
   });
+
+  Future<Either<Failure, Unit>> updateLogoBase64({
+    required String businessId,
+    required String logoBase64,
+  });
 }

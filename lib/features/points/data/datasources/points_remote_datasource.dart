@@ -17,6 +17,7 @@ abstract class PointsRemoteDataSource {
     required String businessId,
     required String businessName,
     required String promotionTitle,
+    required String promotionId,
     required int pointsCost,
   });
 
@@ -77,6 +78,7 @@ class PointsRemoteDataSourceImpl implements PointsRemoteDataSource {
     required String businessId,
     required String businessName,
     required String promotionTitle,
+    required String promotionId,
     required int pointsCost,
   }) async {
     final userRef = _firestore.collection('users').doc(userId);
@@ -107,7 +109,10 @@ class PointsRemoteDataSourceImpl implements PointsRemoteDataSource {
       );
 
       firestoreTx.set(txRef, txModel.toMap());
-      firestoreTx.update(userRef, {'points': newTotal});
+      firestoreTx.update(userRef, {
+        'points': newTotal,
+        'redeemedPromoIds': FieldValue.arrayUnion([promotionId]),
+      });
     });
 
     return newTotal;

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:bonvo/config/routes/app_router.dart';
+import 'package:bonvo/core/services/notification_service.dart';
+import 'package:bonvo/injection/injection.dart';
 
 class FcmService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -33,6 +36,7 @@ class FcmService {
       const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      onDidReceiveNotificationResponse: (_) => _navigateToPromotions(),
     );
 
     // Guardar token en Firestore para que el admin pueda rastrear
@@ -57,10 +61,14 @@ class FcmService {
     // Notificaciones cuando la app está en primer plano
     FirebaseMessaging.onMessage.listen(_showLocalNotification);
 
-    // Cuando el usuario toca la notificación con la app en background
-    FirebaseMessaging.onMessageOpenedApp.listen((_) {
-      // Aquí puedes navegar a una pantalla específica si lo necesitas
-    });
+    // Cuando el usuario toca la notificación con la app en background/cerrada
+    FirebaseMessaging.onMessageOpenedApp.listen((_) => _navigateToPromotions());
+  }
+
+  void _navigateToPromotions() {
+    final ids = getIt<NotificationService>().businessIds;
+    if (ids.isEmpty) return;
+    getIt<AppRouter>().router.push('/client/promotions', extra: ids);
   }
 
   Future<void> subscribeToBusinessTopic(String businessId) async {

@@ -18,6 +18,7 @@ abstract class BusinessRemoteDataSource {
   Future<List<ClientSummary>> getBusinessClients(String businessId);
   Future<void> updatePointsPerSol({required String businessId, required int pointsPerSol});
   Future<void> updateBannerBase64({required String businessId, required String bannerBase64});
+  Future<void> updateLogoBase64({required String businessId, required String logoBase64});
 }
 
 class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
@@ -151,6 +152,7 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
           email: data['email'] as String? ?? '',
           transactionCount: txCount[uid] ?? 0,
           lastVisit: lastVisit[uid] ?? DateTime.now(),
+          photoBase64: data['photoBase64'] as String?,
         ));
       }
 
@@ -186,6 +188,21 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
           .collection('businesses')
           .doc(businessId)
           .update({'bannerBase64': bannerBase64});
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateLogoBase64({
+    required String businessId,
+    required String logoBase64,
+  }) async {
+    try {
+      await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .update({'logoBase64': logoBase64});
     } catch (e) {
       throw ServerException(e.toString());
     }

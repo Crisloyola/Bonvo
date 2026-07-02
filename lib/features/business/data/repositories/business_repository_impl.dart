@@ -101,4 +101,19 @@ class BusinessRepositoryImpl implements BusinessRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, Unit>> updateLogoBase64({
+    required String businessId,
+    required String logoBase64,
+  }) async {
+    try {
+      await _remote.updateLogoBase64(businessId: businessId, logoBase64: logoBase64);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }

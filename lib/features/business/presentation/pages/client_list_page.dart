@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
@@ -205,6 +206,7 @@ class _ClientListPageState extends State<ClientListPage> {
                             lastVisitLabel: _lastVisit(c.lastVisit),
                             pts: _fmtPts(c.transactionCount),
                             color: color,
+                            photoBase64: c.photoBase64,
                           );
                         },
                       ),
@@ -222,6 +224,7 @@ class _ClientTile extends StatelessWidget {
   final String lastVisitLabel;
   final String pts;
   final Color color;
+  final String? photoBase64;
 
   const _ClientTile({
     required this.name,
@@ -229,10 +232,14 @@ class _ClientTile extends StatelessWidget {
     required this.lastVisitLabel,
     required this.pts,
     required this.color,
+    this.photoBase64,
   });
 
   @override
   Widget build(BuildContext context) {
+    final photoBytes =
+        photoBase64 != null ? base64Decode(photoBase64!) : null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -247,15 +254,19 @@ class _ClientTile extends StatelessWidget {
           CircleAvatar(
             radius: 22,
             backgroundColor: color,
-            child: Text(
-              initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                letterSpacing: 0.5,
-              ),
-            ),
+            backgroundImage:
+                photoBytes != null ? MemoryImage(photoBytes) : null,
+            child: photoBytes == null
+                ? Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                    ),
+                  )
+                : null,
           ),
 
           const SizedBox(width: 12),

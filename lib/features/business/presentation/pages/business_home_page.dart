@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -232,6 +233,33 @@ class _DashboardContent extends StatefulWidget {
 class _DashboardContentState extends State<_DashboardContent> {
   bool _bannerUploading = false;
 
+  bool _logoUploading = false;
+
+  Future<void> _changeLogo() async {
+    setState(() => _logoUploading = true);
+    try {
+      final base64 = await getIt<StorageService>().pickLogoImage();
+      if (base64 != null && mounted) {
+        await getIt<BusinessRepository>().updateLogoBase64(
+          businessId: widget.business.id,
+          logoBase64: base64,
+        );
+        if (mounted) {
+          context.read<BusinessCubit>().loadBusiness(widget.business.id);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al subir logo: $e'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _logoUploading = false);
+    }
+  }
+
   Future<void> _changeBanner() async {
     setState(() => _bannerUploading = true);
     try {
@@ -267,25 +295,69 @@ class _DashboardContentState extends State<_DashboardContent> {
         builder: (ctx, setS) => AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
-          title: const Text('Puntos por S/ 1.00',
+          title: const Text('Programa de puntos',
               style: TextStyle(fontWeight: FontWeight.w800)),
-          content: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: const Icon(AppIcons.minusCircle,
-                    color: AppColors.primary),
-                onPressed: pts > 1 ? () => setS(() => pts--) : null,
+              const Text(
+                'Puntos por cada S/ 1.00',
+                style: TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary),
               ),
-              Text('$pts',
-                  style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary)),
-              IconButton(
-                icon: const Icon(AppIcons.plusCircle,
-                    color: AppColors.primary),
-                onPressed: pts < 10 ? () => setS(() => pts++) : null,
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(AppIcons.minusCircle,
+                        color: AppColors.primary),
+                    onPressed: pts > 1 ? () => setS(() => pts--) : null,
+                  ),
+                  Text('$pts',
+                      style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary)),
+                  IconButton(
+                    icon: const Icon(AppIcons.plusCircle,
+                        color: AppColors.primary),
+                    onPressed: pts < 10 ? () => setS(() => pts++) : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Chip cashback efectivo
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.amberTint,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.monetization_on_outlined,
+                        color: AppColors.amberText, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Cashback efectivo: $pts%',
+                      style: const TextStyle(
+                        color: AppColors.amberText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Por cada S/ 100 gastados\nel cliente recibe S/ $pts de cashback',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -360,6 +432,22 @@ class _DashboardContentState extends State<_DashboardContent> {
             _SheetTile(
               icon: AppIcons.image,
               color: const Color(0xFF0284C7),
+              title: _logoUploading
+                  ? 'Subiendo logo...'
+                  : widget.business.logoBase64 != null
+                      ? 'Cambiar logo'
+                      : 'Subir logo del negocio',
+              subtitle: 'Aparece en el encabezado de tu tienda',
+              onTap: _logoUploading
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      _changeLogo();
+                    },
+            ),
+            _SheetTile(
+              icon: AppIcons.upload,
+              color: const Color(0xFF0284C7),
               title: _bannerUploading
                   ? 'Subiendo banner...'
                   : widget.business.bannerBase64 != null
@@ -433,6 +521,14 @@ class _DashboardContentState extends State<_DashboardContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // ── Banner de cashback ──
+                  _CashbackBanner(
+                    pointsPerSol: widget.business.pointsPerSol,
+                    totalPointsIssued: widget.stats.totalPointsIssued,
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Métricas 2×2
                   Row(
                     children: [
@@ -474,10 +570,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _MetricCard(
-                          label: 'Promos activas',
-                          value:
-                              '${widget.stats.activePromotions}',
-                          icon: AppIcons.ticket,
+                          label: 'Cashback emitido',
+                          value: 'S/ ${(widget.stats.totalPointsIssued / 100).toStringAsFixed(2)}',
+                          icon: AppIcons.coins,
                           color: const Color(0xFF7C3AED),
                           bgColor: const Color(0xFFEDE9FE),
                         ),
@@ -668,79 +763,214 @@ class _AdminHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bannerBytes = business.bannerBase64 != null
+        ? base64Decode(business.bannerBase64!)
+        : null;
+
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.gradient),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 16, 18),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(AppIcons.store,
-                    color: Colors.white, size: 26),
+      child: Stack(
+        children: [
+          // Banner como fondo cuando existe
+          if (bannerBytes != null)
+            Positioned.fill(
+              child: Image.memory(
+                bannerBytes,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Negocio',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      business.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                        height: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: Icon(AppIcons.refresh,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    size: 20),
-                onPressed: onRefresh,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: onSettings,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+            ),
+          // Overlay oscuro para legibilidad del texto
+          if (bannerBytes != null)
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xCC065F46), Color(0xAA059669)],
                   ),
-                  child: const Icon(AppIcons.settings,
-                      color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 16, 18),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: business.logoBase64 != null
+                        ? Image.memory(
+                            base64Decode(business.logoBase64!),
+                            fit: BoxFit.cover,
+                          )
+                        : const Icon(AppIcons.store,
+                            color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Negocio',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          business.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(AppIcons.refresh,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        size: 20),
+                    onPressed: onRefresh,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: onSettings,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(AppIcons.settings,
+                          color: Colors.white, size: 22),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+class _CashbackBanner extends StatelessWidget {
+  final int pointsPerSol;
+  final int totalPointsIssued;
+
+  const _CashbackBanner({
+    required this.pointsPerSol,
+    required this.totalPointsIssued,
+  });
+
+  String get _cashbackPct => '$pointsPerSol%';
+  String get _totalCashback =>
+      'S/ ${(totalPointsIssued / 100).toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.monetization_on_outlined,
+                color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Programa de Cashback',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Ofreces $_cashbackPct de cashback',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _totalCashback,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              Text(
+                'total emitido',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -844,6 +1074,10 @@ class _ActivityRow extends StatelessWidget {
         : '?';
     final visits = client.transactionCount;
 
+    final photoBytes = client.photoBase64 != null
+        ? base64Decode(client.photoBase64!)
+        : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -855,22 +1089,21 @@ class _ActivityRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-              ),
-            ),
+          CircleAvatar(
+            radius: 21,
+            backgroundColor: color.withValues(alpha: 0.12),
+            backgroundImage:
+                photoBytes != null ? MemoryImage(photoBytes) : null,
+            child: photoBytes == null
+                ? Text(
+                    initial,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(

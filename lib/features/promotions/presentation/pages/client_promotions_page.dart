@@ -22,6 +22,7 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
   List<Promotion> _promotions = [];
   bool _loading = true;
   String _activeFilter = 'Todas';
+  final Set<String> _redeemedIds = {};
 
   @override
   void initState() {
@@ -104,6 +105,7 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
       businessId: promo.businessId,
       businessName: promo.businessName,
       promotionTitle: promo.title,
+      promotionId: promo.id,
       pointsCost: promo.pointsCost,
     );
 
@@ -114,7 +116,10 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
       )),
-      (newTotal) => _showSuccess(promo, newTotal),
+      (newTotal) {
+        setState(() => _redeemedIds.add(promo.id));
+        _showSuccess(promo, newTotal);
+      },
     );
   }
 
@@ -182,6 +187,10 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
         final user =
             authState is AuthAuthenticated ? authState.user : null;
         final userId = user?.uid ?? '';
+        // Sincroniza los ids del servidor en el set local (sin borrar los locales)
+        if (user != null) {
+          _redeemedIds.addAll(user.redeemedPromoIds);
+        }
 
         return StreamBuilder<int>(
           stream: userId.isNotEmpty
@@ -310,14 +319,17 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
                                   final p = filtered[i];
                                   final canAfford =
                                       userPoints >= p.pointsCost;
+                                  final isRedeemed =
+                                      _redeemedIds.contains(p.id);
                                   return _PromoCard(
                                     promo: p,
                                     canAfford: canAfford,
+                                    isRedeemed: isRedeemed,
                                     userPoints: userPoints,
                                     gradientIndex: p.businessId.isNotEmpty
                                         ? p.businessId.codeUnitAt(0) % 4
                                         : i % 4,
-                                    onRedeem: userId.isNotEmpty
+                                    onRedeem: (!isRedeemed && userId.isNotEmpty)
                                         ? () => _redeem(
                                             p, userId, userPoints)
                                         : null,
@@ -398,6 +410,7 @@ class _PointsBar extends StatelessWidget {
 class _PromoCard extends StatelessWidget {
   final Promotion promo;
   final bool canAfford;
+  final bool isRedeemed;
   final int userPoints;
   final int gradientIndex;
   final VoidCallback? onRedeem;
@@ -405,6 +418,7 @@ class _PromoCard extends StatelessWidget {
   const _PromoCard({
     required this.promo,
     required this.canAfford,
+    required this.isRedeemed,
     required this.userPoints,
     required this.gradientIndex,
     this.onRedeem,
@@ -535,7 +549,32 @@ class _PromoCard extends StatelessWidget {
 
                 const SizedBox(height: 14),
 
-                if (canAfford)
+                if (isRedeemed)
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(AppIcons.check,
+                            size: 16, color: AppColors.textMuted),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Promoción canjeada',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (canAfford)
                   GestureDetector(
                     onTap: onRedeem,
                     child: Container(

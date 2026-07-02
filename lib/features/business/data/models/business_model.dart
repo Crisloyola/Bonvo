@@ -11,6 +11,7 @@ class BusinessModel extends Business {
     double? latitude,
     double? longitude,
     String? bannerBase64,
+    String? logoBase64,
   }) : super(
           id: id,
           name: name,
@@ -20,6 +21,7 @@ class BusinessModel extends Business {
           latitude: latitude,
           longitude: longitude,
           bannerBase64: bannerBase64,
+          logoBase64: logoBase64,
         );
 
   factory BusinessModel.fromFirestore(DocumentSnapshot doc) {
@@ -33,6 +35,7 @@ class BusinessModel extends Business {
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
       bannerBase64: data['bannerBase64'] as String?,
+      logoBase64: data['logoBase64'] as String?,
     );
   }
 
@@ -44,6 +47,7 @@ class BusinessModel extends Business {
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (bannerBase64 != null) 'bannerBase64': bannerBase64,
+        if (logoBase64 != null) 'logoBase64': logoBase64,
         'createdAt': FieldValue.serverTimestamp(),
       };
 }

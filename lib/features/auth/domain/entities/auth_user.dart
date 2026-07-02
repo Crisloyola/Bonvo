@@ -10,6 +10,7 @@ class AuthUser extends Equatable {
   final int points;
   final List<String> businessIds;
   final String? photoBase64;
+  final List<String> redeemedPromoIds;
 
   const AuthUser({
     required this.uid,
@@ -19,8 +20,9 @@ class AuthUser extends Equatable {
     this.points = 0,
     this.businessIds = const [],
     this.photoBase64,
+    this.redeemedPromoIds = const [],
   });
 
   @override
-  List<Object?> get props => [uid, email, name, role, points, businessIds, photoBase64];
+  List<Object?> get props => [uid, email, name, role, points, businessIds, photoBase64, redeemedPromoIds];
 }

@@ -9,6 +9,7 @@ class Business extends Equatable {
   final double? latitude;
   final double? longitude;
   final String? bannerBase64;
+  final String? logoBase64;
 
   const Business({
     required this.id,
@@ -19,12 +20,13 @@ class Business extends Equatable {
     this.latitude,
     this.longitude,
     this.bannerBase64,
+    this.logoBase64,
   });
 
   bool get hasLocation => latitude != null && longitude != null;
 
   @override
-  List<Object?> get props => [id, name, adminId, pointsPerSol, latitude, longitude, bannerBase64];
+  List<Object?> get props => [id, name, adminId, pointsPerSol, latitude, longitude, bannerBase64, logoBase64];
 }
 
 class BusinessStats extends Equatable {
@@ -50,6 +52,7 @@ class ClientSummary extends Equatable {
   final String email;
   final int transactionCount;
   final DateTime lastVisit;
+  final String? photoBase64;
 
   const ClientSummary({
     required this.userId,
@@ -57,8 +60,9 @@ class ClientSummary extends Equatable {
     required this.email,
     required this.transactionCount,
     required this.lastVisit,
+    this.photoBase64,
   });
 
   @override
-  List<Object?> get props => [userId, name, email, transactionCount, lastVisit];
+  List<Object?> get props => [userId, name, email, transactionCount, lastVisit, photoBase64];
 }

@@ -19,6 +19,7 @@ abstract class PointsRepository {
     required String businessId,
     required String businessName,
     required String promotionTitle,
+    required String promotionId,
     required int pointsCost,
   });
 

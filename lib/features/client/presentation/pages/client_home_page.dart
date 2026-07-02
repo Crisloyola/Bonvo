@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
 import 'package:bonvo/core/services/fcm_service.dart';
+import 'package:bonvo/core/services/notification_service.dart';
 import 'package:bonvo/core/services/proximity_service.dart';
 import 'package:bonvo/core/services/storage_service.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
@@ -30,12 +30,13 @@ class ClientHomePage extends StatefulWidget {
 
 class _ClientHomePageState extends State<ClientHomePage> {
   final ProximityService _proximity = ProximityService();
-  final FlutterLocalNotificationsPlugin _localNotif =
-      FlutterLocalNotificationsPlugin();
   bool _proximityStarted = false;
   bool _fcmStarted = false;
+  bool _notifStarted = false;
   final List<StreamSubscription> _announcementSubs = [];
   final Map<String, DateTime> _listeningSince = {};
+  final Map<String, String?> _businessLogos = {};
+  final Map<String, String> _businessNames = {};
 
   Future<void> _startFcmIfNeeded(String uid) async {
     if (_fcmStarted || uid.isEmpty) return;
@@ -43,11 +44,33 @@ class _ClientHomePageState extends State<ClientHomePage> {
     await getIt<FcmService>().init(uid);
   }
 
+  Future<void> _initNotifIfNeeded(List<String> businessIds) async {
+    getIt<NotificationService>().setBusinessIds(businessIds);
+    if (_notifStarted) return;
+    _notifStarted = true;
+    await getIt<NotificationService>().init();
+  }
+
+  Future<void> _fetchBusinessMeta(String businessId) async {
+    if (_businessLogos.containsKey(businessId)) return;
+    final result = await getIt<BusinessRepository>().getBusiness(businessId);
+    result.fold(
+      (_) {
+        _businessLogos[businessId] = null;
+        _businessNames[businessId] = '';
+      },
+      (b) {
+        _businessLogos[businessId] = b.logoBase64;
+        _businessNames[businessId] = b.name;
+      },
+    );
+  }
+
   void _listenAnnouncements(List<String> businessIds) {
     for (final bId in businessIds) {
       if (_listeningSince.containsKey(bId)) continue;
-      final since = DateTime.now();
-      _listeningSince[bId] = since;
+      _listeningSince[bId] = DateTime.now();
+      _fetchBusinessMeta(bId);
       final sub = FirebaseFirestore.instance
           .collection('businesses')
           .doc(bId)
@@ -64,35 +87,17 @@ class _ClientHomePageState extends State<ClientHomePage> {
         final title =
             doc.data()['title'] as String? ?? 'Aviso de tu tienda';
         final body = doc.data()['body'] as String? ?? '';
-        _showLocalPush(title, body);
+        getIt<NotificationService>().show(NotifItem(
+          title: title,
+          body: body,
+          businessId: bId,
+          businessName: _businessNames[bId] ?? '',
+          logoBase64: _businessLogos[bId],
+          at: DateTime.now(),
+        ));
       });
       _announcementSubs.add(sub);
     }
-  }
-
-  void _showLocalPush(String title, String body) {
-    _localNotif.show(
-      title.hashCode,
-      title,
-      body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'business_channel',
-          'Notificaciones de negocios',
-          channelDescription: 'Avisos de tus tiendas inscritas',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          color: const Color(0xFF059669),
-          styleInformation: BigTextStyleInformation(
-            body,
-            contentTitle: title,
-            htmlFormatBigText: false,
-            htmlFormatContentTitle: false,
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _startProximityIfNeeded(List<String> businessIds) async {
@@ -126,6 +131,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
         if (user == null) return const SizedBox.shrink();
 
         _startFcmIfNeeded(user.uid);
+        _initNotifIfNeeded(user.businessIds);
         _startProximityIfNeeded(user.businessIds);
         _listenAnnouncements(user.businessIds);
 
@@ -459,32 +465,189 @@ class _HeaderState extends State<_Header> {
               ),
 
               // Campana con badge
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_outlined,
-                      color: AppColors.textPrimary,
-                      size: 26,
-                    ),
-                    onPressed: () {},
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
+              ValueListenableBuilder<int>(
+                valueListenable:
+                    getIt<NotificationService>().unreadCount,
+                builder: (context, notifCount, _) {
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.notifications_outlined,
+                          color: AppColors.textPrimary,
+                          size: 26,
+                        ),
+                        onPressed: () => _openNotifSheet(context),
                       ),
-                    ),
-                  ),
-                ],
+                      if (notifCount > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
+                            constraints: const BoxConstraints(
+                                minWidth: 16, minHeight: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              notifCount > 99 ? '99+' : '$notifCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _openNotifSheet(BuildContext context) {
+    final svc = getIt<NotificationService>();
+    svc.clearCount();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NotifSheet(items: List.of(svc.items)),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+class _NotifSheet extends StatelessWidget {
+  final List<NotifItem> items;
+  const _NotifSheet({required this.items});
+
+  String _timeAgo(DateTime dt) {
+    final d = DateTime.now().difference(dt);
+    if (d.inMinutes < 1) return 'Ahora';
+    if (d.inMinutes < 60) return 'Hace ${d.inMinutes} min';
+    if (d.inHours < 24) return 'Hace ${d.inHours} h';
+    if (d.inDays == 1) return 'Ayer';
+    return 'Hace ${d.inDays} días';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Text('Notificaciones',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary)),
+                  const Spacer(),
+                  if (items.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.push('/client/promotions',
+                            extra: getIt<NotificationService>().businessIds);
+                      },
+                      child: const Text('Ver promos',
+                          style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: items.isEmpty
+                  ? const Center(
+                      child: Text('Sin notificaciones',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    )
+                  : ListView.separated(
+                      controller: ctrl,
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, i) {
+                        final n = items[i];
+                        final logoBytes = n.logoBase64 != null
+                            ? base64Decode(n.logoBase64!)
+                            : null;
+                        return ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 6),
+                          leading: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: AppColors.greenTint,
+                            backgroundImage: logoBytes != null
+                                ? MemoryImage(logoBytes)
+                                : null,
+                            child: logoBytes == null
+                                ? const Icon(Icons.storefront_rounded,
+                                    color: AppColors.primary, size: 20)
+                                : null,
+                          ),
+                          title: Text(n.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (n.body.isNotEmpty)
+                                Text(n.body,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary)),
+                              Text(_timeAgo(n.at),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted)),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            ctx.push('/client/promotions',
+                                extra: getIt<NotificationService>()
+                                    .businessIds);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );

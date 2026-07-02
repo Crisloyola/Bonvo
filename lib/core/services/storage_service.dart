@@ -10,6 +10,9 @@ class StorageService {
   Future<String?> pickBannerImage() =>
       _pickAndEncode(maxDimension: 800, quality: 65);
 
+  Future<String?> pickLogoImage() =>
+      _pickAndEncode(maxDimension: 400, quality: 80);
+
   Future<String?> _pickAndEncode({
     required int maxDimension,
     required int quality,

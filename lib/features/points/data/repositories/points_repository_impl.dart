@@ -40,6 +40,7 @@ class PointsRepositoryImpl implements PointsRepository {
     required String businessId,
     required String businessName,
     required String promotionTitle,
+    required String promotionId,
     required int pointsCost,
   }) async {
     try {
@@ -48,6 +49,7 @@ class PointsRepositoryImpl implements PointsRepository {
         businessId: businessId,
         businessName: businessName,
         promotionTitle: promotionTitle,
+        promotionId: promotionId,
         pointsCost: pointsCost,
       );
       return Right(total);

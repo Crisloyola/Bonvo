@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
@@ -79,6 +80,7 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
         pos = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 10),
           ),
         );
       }
@@ -310,68 +312,67 @@ class _BusinessTile extends StatelessWidget {
     this.distance,
   });
 
-  static const _colors = [
-    Color(0xFFF59E0B),
-    AppColors.primary,
-    Color(0xFFDC2626),
-    Color(0xFF0284C7),
-    Color(0xFF7C3AED),
-    Color(0xFF0D9488),
+  static const _gradients = [
+    LinearGradient(
+      colors: [Color(0xFF065F46), Color(0xFF059669)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    LinearGradient(
+      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    LinearGradient(
+      colors: [Color(0xFF7C2D12), Color(0xFFEA580C)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    LinearGradient(
+      colors: [Color(0xFF4C1D95), Color(0xFF7C3AED)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    LinearGradient(
+      colors: [Color(0xFF881337), Color(0xFFE11D48)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    LinearGradient(
+      colors: [Color(0xFF134E4A), Color(0xFF0D9488)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
   ];
-  static const _bgColors = [
-    Color(0xFFFEF3C7),
-    AppColors.greenTint,
-    Color(0xFFFEE2E2),
-    Color(0xFFE0F2FE),
-    Color(0xFFEDE9FE),
-    Color(0xFFCCFBF1),
-  ];
+
   static const _defaultIcons = [
-    Icons.local_cafe_rounded,
     Icons.storefront_rounded,
+    Icons.local_cafe_rounded,
     Icons.local_pizza_rounded,
     Icons.restaurant_rounded,
     Icons.shopping_bag_rounded,
     Icons.spa_rounded,
   ];
 
-  int get _colorIdx =>
-      business.name.codeUnitAt(0) % _colors.length;
-
-  Color get _color => _colors[_colorIdx];
-  Color get _bgColor => _bgColors[_colorIdx];
-
+  int get _idx => business.name.codeUnitAt(0) % _gradients.length;
+  LinearGradient get _gradient => _gradients[_idx];
   IconData get _icon {
     final t =
         '${business.name.toLowerCase()} ${business.description.toLowerCase()}';
-    if (t.contains('café') ||
-        t.contains('coffee') ||
-        t.contains('cafet')) {
+    if (t.contains('café') || t.contains('coffee') || t.contains('cafet')) {
       return Icons.local_cafe_rounded;
     }
-    if (t.contains('pizza')) { return Icons.local_pizza_rounded; }
-    if (t.contains('jug') ||
-        t.contains('frut') ||
-        t.contains('natur')) {
-      return Icons.local_bar_rounded;
-    }
-    if (t.contains('rest') || t.contains('comid')) {
-      return Icons.restaurant_rounded;
-    }
-    if (t.contains('ropa') || t.contains('moda')) {
-      return Icons.shopping_bag_rounded;
-    }
-    return _defaultIcons[_colorIdx];
+    if (t.contains('pizza')) return Icons.local_pizza_rounded;
+    if (t.contains('jug') || t.contains('frut')) return Icons.local_bar_rounded;
+    if (t.contains('rest') || t.contains('comid')) return Icons.restaurant_rounded;
+    if (t.contains('ropa') || t.contains('moda')) return Icons.shopping_bag_rounded;
+    return _defaultIcons[_idx];
   }
 
   String get _category {
     final t =
         '${business.name.toLowerCase()} ${business.description.toLowerCase()}';
-    if (t.contains('café') ||
-        t.contains('coffee') ||
-        t.contains('cafet')) {
-      return 'Cafetería';
-    }
+    if (t.contains('café') || t.contains('coffee') || t.contains('cafet')) return 'Cafetería';
     if (t.contains('pizza')) return 'Pizzería';
     if (t.contains('jug') || t.contains('frut')) return 'Juguería';
     if (t.contains('rest') || t.contains('comid')) return 'Restaurante';
@@ -381,8 +382,8 @@ class _BusinessTile extends StatelessWidget {
   }
 
   String _formatDist(double m) {
-    if (m < 1000) return 'A ${m.round()} m';
-    return 'A ${(m / 1000).toStringAsFixed(1)} km';
+    if (m < 1000) return '${m.round()} m';
+    return '${(m / 1000).toStringAsFixed(1)} km';
   }
 
   String _formatPts(int pts) {
@@ -392,114 +393,307 @@ class _BusinessTile extends StatelessWidget {
     return '$pts';
   }
 
+  String get _cashback {
+    final soles = points / 100.0;
+    return 'S/ ${soles.toStringAsFixed(2)}';
+  }
+
+  // Progreso hacia el próximo nivel de cashback (cada 500 pts = S/5.00)
+  static const int _levelSize = 500;
+  int get _pointsInLevel => points % _levelSize;
+  double get _progress => _pointsInLevel / _levelSize;
+  int get _ptsToNext => _levelSize - _pointsInLevel;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.card,
-      ),
-      child: Row(
-        children: [
-          // Avatar con ícono de categoría
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: _bgColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(_icon, color: _color, size: 26),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Nombre + distancia + categoría
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  business.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      distance != null
-                          ? Icons.location_on_rounded
-                          : Icons.store_rounded,
-                      size: 12,
-                      color: AppColors.textMuted,
-                    ),
-                    const SizedBox(width: 3),
-                    if (distance != null) ...[
-                      Text(
-                        _formatDist(distance!),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const Text(
-                        ' · ',
-                        style: TextStyle(
-                            fontSize: 12, color: AppColors.textMuted),
-                      ),
-                    ],
-                    Flexible(
-                      child: Text(
-                        _category,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Puntos por negocio
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _formatPts(points),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const Text(
-                'PUNTOS',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(AppRadius.cardLg),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+            spreadRadius: -4,
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.cardLg),
+        child: Column(
+          children: [
+            // ── Header degradado ──
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.cardLg)),
+              child: Stack(
+                children: [
+                  // Banner de fondo cuando existe
+                  if (business.bannerBase64 != null)
+                    Positioned.fill(
+                      child: Image.memory(
+                        base64Decode(business.bannerBase64!),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                    decoration: BoxDecoration(
+                      gradient: business.bannerBase64 != null
+                          ? LinearGradient(
+                              colors: [
+                                Colors.black.withValues(alpha: 0.55),
+                                Colors.black.withValues(alpha: 0.35),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : _gradient,
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            // Logo o ícono
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: business.logoBase64 != null
+                                  ? Image.memory(
+                                      base64Decode(business.logoBase64!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Icon(_icon, color: Colors.white, size: 22),
+                            ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              business.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  _category,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (distance != null) ...[
+                                  Text(
+                                    ' · ',
+                                    style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.5),
+                                        fontSize: 12),
+                                  ),
+                                  Icon(Icons.location_on_rounded,
+                                      size: 11,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.75)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    _formatDist(distance!),
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.75),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Puntos grandes
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatPts(points),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                              height: 1,
+                            ),
+                          ),
+                          Text(
+                            'PUNTOS',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Barra de progreso
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Faltan $_ptsToNext pts para tu próximo cashback',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'S/ 5.00',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: _progress,
+                          minHeight: 6,
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+                ],
+              ),
+            ),
+
+            // ── Footer blanco: cashback + config ──
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  // Cashback disponible
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.amberTint,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.monetization_on_outlined,
+                              color: AppColors.amberText, size: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Cashback',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              _cashback,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.amberText,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divisor
+                  Container(
+                    width: 1,
+                    height: 32,
+                    color: AppColors.border,
+                  ),
+
+                  // Pts por sol
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'Ganás por S/ 1.00',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMuted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '${business.pointsPerSol} pt${business.pointsPerSol != 1 ? 's' : ''}',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.greenTint,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.star_border_rounded,
+                              color: AppColors.primary, size: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

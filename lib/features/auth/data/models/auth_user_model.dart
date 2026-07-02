@@ -9,6 +9,7 @@ class AuthUserModel extends AuthUser {
     super.points,
     super.businessIds,
     super.photoBase64,
+    super.redeemedPromoIds,
   });
 
   factory AuthUserModel.fromFirestore(
@@ -26,6 +27,7 @@ class AuthUserModel extends AuthUser {
       points: (data['points'] as num?)?.toInt() ?? 0,
       businessIds: List<String>.from(data['businessIds'] as List? ?? []),
       photoBase64: data['photoBase64'] as String?,
+      redeemedPromoIds: List<String>.from(data['redeemedPromoIds'] as List? ?? []),
     );
   }
 
