@@ -64,6 +64,14 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
       if (base64 != null && mounted) {
         setState(() => _bannerBase64 = base64);
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('$e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     } finally {
       if (mounted) setState(() => _pickingBanner = false);
     }

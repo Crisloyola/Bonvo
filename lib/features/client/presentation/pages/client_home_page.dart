@@ -402,7 +402,14 @@ class _HeaderState extends State<_Header> {
             .doc(widget.user.uid)
             .update({'photoBase64': base64});
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se pudo cambiar la foto: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
