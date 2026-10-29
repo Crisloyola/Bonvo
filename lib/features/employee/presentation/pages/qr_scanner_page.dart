@@ -79,7 +79,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
           ),
 
           // Marco del QR con esquinas coloreadas
-          Center(
+          const Center(
             child: SizedBox(
               width: 240,
               height: 240,
@@ -196,7 +196,7 @@ class _CornerPainter extends CustomPainter {
         Path()
           ..moveTo(0, cornerLen)
           ..lineTo(0, r)
-          ..arcToPoint(Offset(r, 0),
+          ..arcToPoint(const Offset(r, 0),
               radius: const Radius.circular(r), clockwise: true)
           ..lineTo(cornerLen, 0),
         paint);

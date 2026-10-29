@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:bonvo/features/loyalty/domain/loyalty.dart';
 
 class Business extends Equatable {
   final String id;
@@ -10,6 +11,7 @@ class Business extends Equatable {
   final double? longitude;
   final String? bannerBase64;
   final String? logoBase64;
+  final LoyaltyPrograms programs;
 
   const Business({
     required this.id,
@@ -21,12 +23,13 @@ class Business extends Equatable {
     this.longitude,
     this.bannerBase64,
     this.logoBase64,
+    this.programs = const LoyaltyPrograms(),
   });
 
   bool get hasLocation => latitude != null && longitude != null;
 
   @override
-  List<Object?> get props => [id, name, adminId, pointsPerSol, latitude, longitude, bannerBase64, logoBase64];
+  List<Object?> get props => [id, name, adminId, pointsPerSol, latitude, longitude, bannerBase64, logoBase64, programs];
 }
 
 class BusinessStats extends Equatable {
@@ -34,16 +37,18 @@ class BusinessStats extends Equatable {
   final int totalPointsIssued;
   final int uniqueClients;
   final int activePromotions;
+  final int cashbackIssuedCents;
 
   const BusinessStats({
     required this.totalTransactions,
     required this.totalPointsIssued,
     required this.uniqueClients,
     this.activePromotions = 0,
+    this.cashbackIssuedCents = 0,
   });
 
   @override
-  List<Object?> get props => [totalTransactions, totalPointsIssued, uniqueClients, activePromotions];
+  List<Object?> get props => [totalTransactions, totalPointsIssued, uniqueClients, activePromotions, cashbackIssuedCents];
 }
 
 class ClientSummary extends Equatable {

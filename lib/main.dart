@@ -1,12 +1,16 @@
-﻿import 'package:firebase_core/firebase_core.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bonvo/config/routes/app_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
+import 'package:bonvo/firebase_options.dart';
 import 'package:bonvo/injection/injection.dart';
 
 // Handler para mensajes FCM cuando la app está cerrada o en background
@@ -20,11 +24,21 @@ bool _firebaseReady = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
 
   try {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+    if (kIsWeb) {
+      // En web no hay push ni background handler
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+    } else {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+    }
+    // Pruebas locales: flutter build/run --dart-define=USE_EMULATOR=true
+    // conecta Auth y Firestore a los emuladores en vez de producción.
+    if (const bool.fromEnvironment('USE_EMULATOR')) {
+      FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
+      await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+    }
     _firebaseReady = true;
   } catch (e) {
     // google-services.json aún no configurado: la app corre en modo UI-preview
@@ -34,6 +48,13 @@ Future<void> main() async {
   await configureDependencies();
 
   if (_firebaseReady) {
+    // No se recuerda la sesión: cada vez que se abre la app (o se recarga
+    // la página en web) hay que iniciar sesión de nuevo.
+    try {
+      await getIt<AuthRemoteDataSource>().logout();
+    } catch (e) {
+      debugPrint('⚠️  No se pudo cerrar la sesión previa: $e');
+    }
     getIt<AuthBloc>().add(const AuthStarted());
   }
 

@@ -3,42 +3,47 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // ══════════════════════════════════════════════════════════
-// COLORES
+// COLORES — paleta Creatrixweb (negro, blanco y púrpura)
 // ══════════════════════════════════════════════════════════
 class AppColors {
-  // Brand primario
-  static const primary = Color(0xFF059669);
-  static const primaryDeep = Color(0xFF065F46);
-  static const primaryLight = Color(0xFF10B981);
+  // Brand primario: --violet, --violet-dark y púrpura medio del Hero
+  static const primary = Color(0xFF7C3AED);
+  static const primaryDeep = Color(0xFF5B21B6);
+  static const primaryLight = Color(0xFF9B6BFF);
 
-  // Ámbar / acento puntos
-  static const amber = Color(0xFFF59E0B);
-  static const amberTint = Color(0xFFFEF3C7);
-  static const amberText = Color(0xFFB45309);
+  // Acento de puntos/cashback: bloques oscuros (--ink y #2a2a27).
+  // Se mantienen los nombres "amber" por compatibilidad con el código.
+  static const amber = Color(0xFF2A2A27);
+  static const amberTint = Color(0xFFECECEC);
+  static const amberText = Color(0xFF0F0F0E);
 
-  // Tintes verdes
-  static const greenTint = Color(0xFFECFDF5);
-  static const greenBorder = Color(0xFFD4EDE1);
+  // Tintes de marca: --violet-claro (los nombres "green" son heredados)
+  static const greenTint = Color(0xFFEDE5FF);
+  static const greenBorder = Color(0xFFD9C8FF);
 
-  // Superficies
-  static const background = Color(0xFFF6F7F9);
+  // Lilas para usar sobre fondos oscuros
+  static const lilac = Color(0xFFB794FF);
+  static const lilacLight = Color(0xFFC4A6FF);
+
+  // Superficies: --s1 (hueso cálido), --card y --line
+  static const background = Color(0xFFF1F1EC);
   static const surface = Color(0xFFFFFFFF);
-  static const border = Color(0xFFEEF0F3);
+  static const border = Color(0xFFE0E0D8);
 
-  // Texto
-  static const textPrimary = Color(0xFF16221C);
-  static const textSecondary = Color(0xFF64748B);
-  static const textMuted = Color(0xFF94A3B8);
+  // Texto: --ink, --ink-mut y --mut
+  static const textPrimary = Color(0xFF0F0F0E);
+  static const textSecondary = Color(0xFF5D5E57);
+  static const textMuted = Color(0xFF8B8C84);
 
   // Estado
-  static const error = Color(0xFFDC2626);
-  static const success = Color(0xFF059669);
+  static const error = Color(0xFFE5484D);
+  static const success = Color(0xFF7C3AED);
 
-  // Gradiente de marca 145°  #10B981 → #059669 → #065F46
+  // Gradiente de marca 145°  #9b6bff → #7c3aed → #5b21b6
   static const gradient = LinearGradient(
     begin: Alignment(-0.7, -1.0),
     end: Alignment(0.7, 1.0),
-    colors: [Color(0xFF10B981), Color(0xFF059669), Color(0xFF065F46)],
+    colors: [Color(0xFF9B6BFF), Color(0xFF7C3AED), Color(0xFF5B21B6)],
     stops: [0.0, 0.45, 1.0],
   );
 
@@ -53,17 +58,17 @@ class AppColors {
   static const gradientHeader = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF10B981), Color(0xFF059669), Color(0xFF065F46)],
+    colors: [Color(0xFF9B6BFF), Color(0xFF7C3AED), Color(0xFF5B21B6)],
   );
   static const gradientCard = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF10B981), Color(0xFF059669)],
+    colors: [Color(0xFF9B6BFF), Color(0xFF7C3AED)],
   );
   static const gradientAccent = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+    colors: [Color(0xFF2A2A27), Color(0xFF0F0F0E)],
   );
 }
 
@@ -111,7 +116,7 @@ class AppShadows {
 
   static const button = [
     BoxShadow(
-      color: Color(0x66059669),
+      color: Color(0x667C3AED),
       blurRadius: 24,
       offset: Offset(0, 12),
       spreadRadius: -10,
@@ -268,7 +273,7 @@ class AppTheme {
       errorContainer: Color(0xFFFEE2E2),
       onErrorContainer: Color(0xFF7F1D1D),
       outline: AppColors.border,
-      outlineVariant: Color(0xFFE6E9EE),
+      outlineVariant: Color(0xFFDEDED6),
     );
 
     return ThemeData(
@@ -311,11 +316,11 @@ class AppTheme {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: Color(0xFFE6E9EE)),
+          borderSide: const BorderSide(color: Color(0xFFDEDED6)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: Color(0xFFE6E9EE)),
+          borderSide: const BorderSide(color: Color(0xFFDEDED6)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
@@ -374,15 +379,15 @@ class AppTheme {
         ),
       ),
 
-      chipTheme: ChipThemeData(
+      chipTheme: const ChipThemeData(
         backgroundColor: AppColors.greenTint,
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
             color: AppColors.primary,
             fontWeight: FontWeight.w600,
             fontSize: 13),
         side: BorderSide.none,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        shape: const StadiumBorder(),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: StadiumBorder(),
       ),
 
       dividerTheme: const DividerThemeData(

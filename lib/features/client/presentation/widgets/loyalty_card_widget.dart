@@ -46,7 +46,7 @@ class LoyaltyCardWidget extends StatelessWidget {
         borderRadius: BorderRadius.all(Radius.circular(AppRadius.cardLg)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x55059669),
+            color: Color(0x557C3AED),
             blurRadius: 28,
             offset: Offset(0, 12),
             spreadRadius: -8,

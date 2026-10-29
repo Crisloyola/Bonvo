@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
+import 'package:bonvo/features/auth/presentation/widgets/auth_split_layout.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -77,12 +79,7 @@ class _RegisterPageState extends State<RegisterPage> {
         setState(() => _loading = state is AuthLoading);
       },
       builder: (context, state) {
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Form(
+        final form = Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -306,7 +303,16 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: 24),
                   ],
                 ),
-              ),
+              );
+
+        if (context.isWide) return AuthSplitLayout(child: form);
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: form,
             ),
           ),
         );
@@ -326,16 +332,16 @@ class _RegisterPageState extends State<RegisterPage> {
         prefixIcon: Icon(icon, size: 18, color: AppColors.textMuted),
         suffixIcon: suffix,
         filled: true,
-        fillColor: const Color(0xFFF9FAFB),
+        fillColor: const Color(0xFFF3F3EE),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: const BorderSide(color: Color(0xFFE0E0D8)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: const BorderSide(color: Color(0xFFE0E0D8)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

@@ -10,6 +10,9 @@ class Promotion extends Equatable {
   final bool active;
   final DateTime createdAt;
 
+  /// Foto del regalo/promoción (JPEG comprimido en base64).
+  final String? imageBase64;
+
   const Promotion({
     required this.id,
     required this.businessId,
@@ -19,6 +22,7 @@ class Promotion extends Equatable {
     required this.pointsCost,
     required this.active,
     required this.createdAt,
+    this.imageBase64,
   });
 
   bool get isFree => pointsCost == 0;

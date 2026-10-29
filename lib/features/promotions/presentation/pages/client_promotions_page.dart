@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
-import 'package:bonvo/features/points/domain/repositories/points_repository.dart';
+import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
+import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
 import 'package:bonvo/injection/injection.dart';
@@ -56,128 +58,11 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
     return active.where((p) => p.businessName == _activeFilter).toList();
   }
 
+  /// Los canjes se piden desde la tienda: ahí están los puntos de esa
+  /// tienda y el negocio aprueba la entrega.
   Future<void> _redeem(
       Promotion promo, String userId, int currentPoints) async {
-    if (currentPoints < promo.pointsCost) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content:
-            Text('Necesitas ${promo.pointsCost} pts. Tienes $currentPoints.'),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Canjear promoción',
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(promo.title,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Se descontarán ${promo.pointsCost} pts de tu cuenta.'),
-            const SizedBox(height: 4),
-            Text('Puntos restantes: ${currentPoints - promo.pointsCost}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Canjear')),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    final result = await getIt<PointsRepository>().redeemPromotion(
-      userId: userId,
-      businessId: promo.businessId,
-      businessName: promo.businessName,
-      promotionTitle: promo.title,
-      promotionId: promo.id,
-      pointsCost: promo.pointsCost,
-    );
-
-    if (!mounted) return;
-    result.fold(
-      (f) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(f.message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      )),
-      (newTotal) {
-        setState(() => _redeemedIds.add(promo.id));
-        _showSuccess(promo, newTotal);
-      },
-    );
-  }
-
-  void _showSuccess(Promotion promo, int newTotal) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: Container(
-          width: 64,
-          height: 64,
-          decoration: const BoxDecoration(
-              color: AppColors.greenTint, shape: BoxShape.circle),
-          child: const Icon(AppIcons.check,
-              color: AppColors.primary, size: 36),
-        ),
-        title: const Text('¡Canje exitoso!',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(promo.title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text(
-              'Muestra esta pantalla al cajero para aplicar tu beneficio.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.greenTint,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text('Puntos restantes: $newTotal',
-                  style: const TextStyle(
-                      color: AppColors.primary, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _load();
-              },
-              child: const Text('Listo'),
-            ),
-          ),
-        ],
-      ),
-    );
+    context.push('/client/store', extra: {'businessId': promo.businessId});
   }
 
   @override
@@ -194,38 +79,33 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
 
         return StreamBuilder<int>(
           stream: userId.isNotEmpty
-              ? getIt<PointsRepository>().watchUserPoints(userId)
+              ? getIt<LoyaltyRepository>()
+                  .watchTotalPoints(userId, user!.businessIds)
               : const Stream.empty(),
-          initialData: user?.points ?? 0,
+          initialData: 0,
           builder: (context, snap) {
             final userPoints = snap.data ?? 0;
             final filtered = _filteredFor(userPoints);
 
-            return Scaffold(
-              backgroundColor: AppColors.background,
-              floatingActionButton: FloatingActionButton(
-                backgroundColor: AppColors.primary,
-                elevation: 4,
-                shape: const CircleBorder(),
-                onPressed: () {
-                  if (userId.isNotEmpty && user != null) {
-                    context.push('/client/qr', extra: {
-                      'userId': userId,
-                      'userName': user.name,
-                    });
-                  }
-                },
-                child: const Icon(AppIcons.scanner,
-                    color: Colors.white, size: 28),
-              ),
-              floatingActionButtonLocation:
-                  FloatingActionButtonLocation.centerDocked,
-              bottomNavigationBar: _BottomBar(
-                onInicio: () => context.go('/client/home'),
-                onTiendas: () => context.push('/client/tiendas'),
-                onPerfil: () {},
-              ),
-              body: Column(
+            final wide = context.isWide;
+
+            Widget cardFor(Promotion p, int i) {
+              final isRedeemed = _redeemedIds.contains(p.id);
+              return _PromoCard(
+                promo: p,
+                canAfford: userPoints >= p.pointsCost,
+                isRedeemed: isRedeemed,
+                userPoints: userPoints,
+                gradientIndex: p.businessId.isNotEmpty
+                    ? p.businessId.codeUnitAt(0) % 4
+                    : i % 4,
+                onRedeem: (!isRedeemed && userId.isNotEmpty)
+                    ? () => _redeem(p, userId, userPoints)
+                    : null,
+              );
+            }
+
+            final body = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // ── Título ──
@@ -251,7 +131,14 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
                   // ── Barra de puntos ámbar ──
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: _PointsBar(points: userPoints),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                            maxWidth: wide ? 520 : double.infinity),
+                        child: _PointsBar(points: userPoints),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -276,12 +163,12 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
                                 horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
                               color: active
-                                  ? const Color(0xFF1A1A2E)
+                                  ? const Color(0xFF0F0F0E)
                                   : Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: active
-                                    ? const Color(0xFF1A1A2E)
+                                    ? const Color(0xFF0F0F0E)
                                     : AppColors.border,
                               ),
                             ),
@@ -309,36 +196,65 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : filtered.isEmpty
                             ? const _EmptyState()
-                            : ListView.separated(
+                            : wide
+                                ? SingleChildScrollView(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 0, 16, 32),
+                                    child: ResponsiveWrapGrid(
+                                      minItemWidth: 340,
+                                      spacing: 16,
+                                      children: [
+                                        for (var i = 0; i < filtered.length; i++)
+                                          cardFor(filtered[i], i),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(
                                     16, 0, 16, 24),
                                 itemCount: filtered.length,
                                 separatorBuilder: (_, __) =>
                                     const SizedBox(height: 14),
-                                itemBuilder: (_, i) {
-                                  final p = filtered[i];
-                                  final canAfford =
-                                      userPoints >= p.pointsCost;
-                                  final isRedeemed =
-                                      _redeemedIds.contains(p.id);
-                                  return _PromoCard(
-                                    promo: p,
-                                    canAfford: canAfford,
-                                    isRedeemed: isRedeemed,
-                                    userPoints: userPoints,
-                                    gradientIndex: p.businessId.isNotEmpty
-                                        ? p.businessId.codeUnitAt(0) % 4
-                                        : i % 4,
-                                    onRedeem: (!isRedeemed && userId.isNotEmpty)
-                                        ? () => _redeem(
-                                            p, userId, userPoints)
-                                        : null,
-                                  );
-                                },
+                                itemBuilder: (_, i) =>
+                                    cardFor(filtered[i], i),
                               ),
                   ),
                 ],
+              );
+
+            if (wide && user != null) {
+              return ClientWebShell(
+                current: ClientSection.promotions,
+                user: user,
+                child: body,
+              );
+            }
+
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              floatingActionButton: FloatingActionButton(
+                backgroundColor: AppColors.primary,
+                elevation: 4,
+                shape: const CircleBorder(),
+                onPressed: () {
+                  if (userId.isNotEmpty && user != null) {
+                    context.push('/client/qr', extra: {
+                      'userId': userId,
+                      'userName': user.name,
+                    });
+                  }
+                },
+                child: const Icon(AppIcons.scanner,
+                    color: Colors.white, size: 28),
               ),
+              floatingActionButtonLocation:
+                  FloatingActionButtonLocation.centerDocked,
+              bottomNavigationBar: _BottomBar(
+                onInicio: () => context.go('/client/home'),
+                onTiendas: () => context.push('/client/tiendas'),
+                onPerfil: () {},
+              ),
+              body: body,
             );
           },
         );
@@ -367,12 +283,12 @@ class _PointsBar extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+          colors: [Color(0xFF2A2A27), Color(0xFF0F0F0E)],
         ),
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+            color: const Color(0xFF2A2A27).withValues(alpha: 0.35),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -428,12 +344,12 @@ class _PromoCard extends StatelessWidget {
     LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFF10B981), Color(0xFF065F46)],
+      colors: [Color(0xFF9B6BFF), Color(0xFF5B21B6)],
     ),
     LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+      colors: [Color(0xFF2A2A27), Color(0xFF0F0F0E)],
     ),
     LinearGradient(
       begin: Alignment.topLeft,
@@ -443,7 +359,7 @@ class _PromoCard extends StatelessWidget {
     LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+      colors: [Color(0xFF5B21B6), Color(0xFF5B21B6)],
     ),
   ];
 
@@ -553,17 +469,17 @@ class _PromoCard extends StatelessWidget {
                   Container(
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: const Color(0xFFF3F3EE),
                       borderRadius: BorderRadius.circular(AppRadius.button),
                     ),
                     alignment: Alignment.center,
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(AppIcons.check,
+                        Icon(AppIcons.check,
                             size: 16, color: AppColors.textMuted),
-                        const SizedBox(width: 6),
-                        const Text(
+                        SizedBox(width: 6),
+                        Text(
                           'Promoción canjeada',
                           style: TextStyle(
                             color: AppColors.textMuted,

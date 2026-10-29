@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,14 +10,16 @@ import 'package:bonvo/core/services/fcm_service.dart';
 import 'package:bonvo/core/services/notification_service.dart';
 import 'package:bonvo/core/services/proximity_service.dart';
 import 'package:bonvo/core/services/storage_service.dart';
+import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/business/domain/entities/business.dart';
 import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
+import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
 import 'package:bonvo/features/client/presentation/widgets/loyalty_card_widget.dart';
-import 'package:bonvo/features/points/domain/repositories/points_repository.dart';
+import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
 import 'package:bonvo/injection/injection.dart';
@@ -101,7 +104,8 @@ class _ClientHomePageState extends State<ClientHomePage> {
   }
 
   Future<void> _startProximityIfNeeded(List<String> businessIds) async {
-    if (_proximityStarted || businessIds.isEmpty) return;
+    // La alerta de cercanía no está disponible en web
+    if (kIsWeb || _proximityStarted || businessIds.isEmpty) return;
     _proximityStarted = true;
     await _proximity.init();
     final businesses = <Business>[];
@@ -135,16 +139,151 @@ class _ClientHomePageState extends State<ClientHomePage> {
         _startProximityIfNeeded(user.businessIds);
         _listenAnnouncements(user.businessIds);
 
+        final wide = context.isWide;
+        final qrExtra = {'userId': user.uid, 'userName': user.name};
+
+        // Tarjeta de fidelización
+        final card = StreamBuilder<int>(
+          stream: getIt<LoyaltyRepository>()
+              .watchTotalPoints(user.uid, user.businessIds),
+          initialData: 0,
+          builder: (context, snap) {
+            return LoyaltyCardWidget(
+              userId: user.uid,
+              userName: user.name,
+              points: snap.data ?? 0,
+              onTapQr: () => context.push('/client/qr', extra: qrExtra),
+            );
+          },
+        );
+
+        // ── 3 Accesos rápidos ──
+        final quickActions = Row(
+          children: [
+            Expanded(
+              child: _QuickAction(
+                icon: Icons.qr_code_scanner_rounded,
+                label: 'Escanear',
+                color: AppColors.primary,
+                bgColor: AppColors.greenTint,
+                onTap: () => context.push('/client/scan-business'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickAction(
+                icon: Icons.card_giftcard_rounded,
+                label: 'Promos',
+                color: AppColors.amberText,
+                bgColor: AppColors.amberTint,
+                onTap: () => context.push(
+                  '/client/promotions',
+                  extra: user.businessIds,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickAction(
+                icon: Icons.storefront_rounded,
+                label: 'Mis tiendas',
+                color: const Color(0xFF5B21B6),
+                bgColor: const Color(0xFFEDE5FF),
+                onTap: () => context.push('/client/tiendas'),
+              ),
+            ),
+          ],
+        );
+
+        // ── Para ti ──
+        final forYou = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Para ti',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => context.push(
+                    '/client/promotions',
+                    extra: user.businessIds,
+                  ),
+                  child: const Text(
+                    'Ver todo',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (user.businessIds.isEmpty)
+              _JoinBanner()
+            else
+              _PromosPreview(businessIds: user.businessIds),
+          ],
+        );
+
+        if (wide) {
+          // Escritorio: tarjeta y accesos a la izquierda, "Para ti" a la derecha
+          return ClientWebShell(
+            current: ClientSection.home,
+            user: user,
+            child: Column(
+              children: [
+                _Header(user: user),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1100),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  card,
+                                  const SizedBox(height: 20),
+                                  quickActions,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            Expanded(flex: 6, child: forYou),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Scaffold(
           backgroundColor: AppColors.background,
           floatingActionButton: FloatingActionButton(
             backgroundColor: AppColors.primary,
             elevation: 4,
             shape: const CircleBorder(),
-            onPressed: () => context.push(
-              '/client/qr',
-              extra: {'userId': user.uid, 'userName': user.name},
-            ),
+            onPressed: () => context.push('/client/scan-business'),
             child: const Icon(
               Icons.qr_code_scanner_rounded,
               color: Colors.white,
@@ -173,112 +312,11 @@ class _ClientHomePageState extends State<ClientHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Tarjeta de fidelización
-                      StreamBuilder<int>(
-                        stream: getIt<PointsRepository>()
-                            .watchUserPoints(user.uid),
-                        initialData: user.points,
-                        builder: (context, snap) {
-                          return LoyaltyCardWidget(
-                            userId: user.uid,
-                            userName: user.name,
-                            points: snap.data ?? user.points,
-                            onTapQr: () => context.push(
-                              '/client/qr',
-                              extra: {
-                                'userId': user.uid,
-                                'userName': user.name
-                              },
-                            ),
-                          );
-                        },
-                      ),
-
+                      card,
                       const SizedBox(height: 20),
-
-                      // ── 3 Accesos rápidos ──
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.qr_code_rounded,
-                              label: 'Mi QR',
-                              color: AppColors.primary,
-                              bgColor: AppColors.greenTint,
-                              onTap: () => context.push(
-                                '/client/qr',
-                                extra: {
-                                  'userId': user.uid,
-                                  'userName': user.name
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.card_giftcard_rounded,
-                              label: 'Promos',
-                              color: AppColors.amberText,
-                              bgColor: AppColors.amberTint,
-                              onTap: () => context.push(
-                                '/client/promotions',
-                                extra: user.businessIds,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.storefront_rounded,
-                              label: 'Tiendas',
-                              color: const Color(0xFF4F46E5),
-                              bgColor: const Color(0xFFEEF2FF),
-                              onTap: () =>
-                                  context.push('/client/scan-business'),
-                            ),
-                          ),
-                        ],
-                      ),
-
+                      quickActions,
                       const SizedBox(height: 28),
-
-                      // ── Para ti ──
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Para ti',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => context.push(
-                              '/client/promotions',
-                              extra: user.businessIds,
-                            ),
-                            child: const Text(
-                              'Ver todo',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      if (user.businessIds.isEmpty)
-                        _JoinBanner()
-                      else
-                        _PromosPreview(businessIds: user.businessIds),
+                      forYou,
                     ],
                   ),
                 ),
@@ -372,11 +410,11 @@ class _HeaderState extends State<_Header> {
 
   Color get _avatarColor {
     final colors = [
-      const Color(0xFFF59E0B),
-      const Color(0xFF0284C7),
+      const Color(0xFF2A2A27),
+      const Color(0xFF5B21B6),
       const Color(0xFF7C3AED),
       AppColors.primary,
-      const Color(0xFFDC2626),
+      const Color(0xFFE5484D),
     ];
     final idx = widget.user.name.isNotEmpty
         ? widget.user.name.codeUnitAt(0) % colors.length
@@ -783,16 +821,16 @@ class _PromoCard extends StatelessWidget {
   const _PromoCard({required this.promo});
 
   static const _iconColors = [
-    Color(0xFFF59E0B),
+    Color(0xFF2A2A27),
     AppColors.primary,
     Color(0xFF7C3AED),
-    Color(0xFF0284C7),
+    Color(0xFF5B21B6),
   ];
   static const _bgColors = [
-    Color(0xFFFEF3C7),
+    Color(0xFFECECEC),
     AppColors.greenTint,
-    Color(0xFFEDE9FE),
-    Color(0xFFE0F2FE),
+    Color(0xFFEDE5FF),
+    Color(0xFFEDE5FF),
   ];
   static const _icons = [
     Icons.local_cafe_rounded,

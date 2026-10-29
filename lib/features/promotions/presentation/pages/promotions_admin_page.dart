@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/utils/responsive.dart';
+import 'package:bonvo/features/business/presentation/widgets/business_web_shell.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
 import 'package:bonvo/injection/injection.dart';
@@ -40,9 +42,64 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage> {
     setState(() => _loading = false);
   }
 
+  Widget _itemFor(Promotion p) {
+    return Dismissible(
+      key: Key(p.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius:
+              BorderRadius.circular(AppRadius.card),
+        ),
+        child: const Icon(AppIcons.delete,
+            color: Colors.white),
+      ),
+      confirmDismiss: (_) => showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          title: const Text('Eliminar promoción'),
+          content: Text(
+              '¿Eliminar "${p.title}"? No se puede deshacer.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      ),
+      onDismissed: (_) async {
+        final repo = getIt<PromotionsRepository>();
+        await repo.togglePromotion(
+            widget.businessId, p.id, false);
+        await repo.deletePromotion(
+            widget.businessId, p.id);
+        _load();
+      },
+      child: _PromoAdminCard(
+        promo: p,
+        businessId: widget.businessId,
+        onToggle: _load,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final wide = context.isWide;
+    final page = Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -114,71 +171,38 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage> {
                 ),
               ),
             )
+          else if (wide)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(32, 28, 32, 100),
+              sliver: SliverToBoxAdapter(
+                // _PromoAdminCard ya trae su margen inferior
+                child: ResponsiveWrapGrid(
+                  minItemWidth: 380,
+                  runSpacing: 0,
+                  children: _promotions.map(_itemFor).toList(),
+                ),
+              ),
+            )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) {
-                    final p = _promotions[i];
-                    return Dismissible(
-                      key: Key(p.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.card),
-                        ),
-                        child: const Icon(AppIcons.delete,
-                            color: Colors.white),
-                      ),
-                      confirmDismiss: (_) => showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          title: const Text('Eliminar promoción'),
-                          content: Text(
-                              '¿Eliminar "${p.title}"? No se puede deshacer.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancelar'),
-                            ),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.error),
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Eliminar'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      onDismissed: (_) async {
-                        final repo = getIt<PromotionsRepository>();
-                        await repo.togglePromotion(
-                            widget.businessId, p.id, false);
-                        await repo.deletePromotion(
-                            widget.businessId, p.id);
-                        _load();
-                      },
-                      child: _PromoAdminCard(
-                        promo: p,
-                        businessId: widget.businessId,
-                        onToggle: _load,
-                      ),
-                    );
-                  },
+                  (_, i) => _itemFor(_promotions[i]),
                   childCount: _promotions.length,
                 ),
               ),
             ),
         ],
       ),
+    );
+
+    if (!wide) return page;
+    return BusinessWebShell(
+      current: BusinessSection.promotions,
+      businessId: widget.businessId,
+      businessName: widget.businessName,
+      child: page,
     );
   }
 }
@@ -205,10 +229,10 @@ class _PromoAdminCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: promo.active ? AppColors.surface : const Color(0xFFF8FAFC),
+        color: promo.active ? AppColors.surface : const Color(0xFFF3F3EE),
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-            color: promo.active ? AppColors.border : const Color(0xFFE2E8F0)),
+            color: promo.active ? AppColors.border : const Color(0xFFDCDCD6)),
         boxShadow: promo.active ? AppShadows.card : [],
       ),
       child: Padding(
@@ -219,7 +243,7 @@ class _PromoAdminCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: promo.active ? iconBg : const Color(0xFFF1F5F9),
+                color: promo.active ? iconBg : const Color(0xFFF3F3EE),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(iconData,

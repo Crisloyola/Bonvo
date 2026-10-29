@@ -39,7 +39,7 @@ class _ScanBusinessQrPageState extends State<ScanBusinessQrPage> {
     _scanned = true;
     _controller.stop();
     final businessId = raw.substring(4);
-    context.pushReplacement('/client/join', extra: {'businessId': businessId});
+    context.pushReplacement('/client/store', extra: {'businessId': businessId});
   }
 
   @override

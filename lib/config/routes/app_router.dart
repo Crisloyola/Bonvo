@@ -1,6 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/core/utils/go_router_refresh_stream.dart';
+import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
@@ -9,12 +11,14 @@ import 'package:bonvo/features/auth/presentation/pages/onboarding_page.dart';
 import 'package:bonvo/features/auth/presentation/pages/register_page.dart';
 import 'package:bonvo/features/client/presentation/pages/mis_tiendas_page.dart';
 import 'package:bonvo/features/business/presentation/pages/business_home_page.dart';
+import 'package:bonvo/features/business/presentation/pages/business_programs_page.dart';
+import 'package:bonvo/features/business/presentation/pages/business_requests_page.dart';
 import 'package:bonvo/features/business/presentation/pages/business_setup_page.dart';
 import 'package:bonvo/features/business/presentation/pages/client_list_page.dart';
 import 'package:bonvo/features/client/presentation/pages/client_home_page.dart';
-import 'package:bonvo/features/client/presentation/pages/join_business_page.dart';
 import 'package:bonvo/features/client/presentation/pages/qr_fullscreen_page.dart';
 import 'package:bonvo/features/client/presentation/pages/scan_business_qr_page.dart';
+import 'package:bonvo/features/client/presentation/pages/store_page.dart';
 import 'package:bonvo/features/client/presentation/pages/transaction_history_page.dart';
 import 'package:bonvo/features/employee/presentation/pages/employee_home_page.dart';
 import 'package:bonvo/features/employee/presentation/pages/points_accreditation_page.dart';
@@ -25,12 +29,29 @@ import 'package:bonvo/features/promotions/presentation/pages/promotions_admin_pa
 
 const _publicRoutes = ['/login', '/register', '/onboarding'];
 
+/// GoRoute cuya página se envuelve en [ResponsiveFrame]: en pantallas anchas
+/// se muestra como columna centrada, salvo las rutas con diseño de escritorio.
+GoRoute _route({
+  required String path,
+  String? name,
+  required GoRouterWidgetBuilder builder,
+}) =>
+    GoRoute(
+      path: path,
+      name: name,
+      builder: (context, state) => ResponsiveFrame(
+        fullWidth: wideLayoutRoutes.contains(path),
+        child: builder(context, state),
+      ),
+    );
+
 class AppRouter {
   late final GoRouter router;
 
   AppRouter({required AuthBloc authBloc}) {
     router = GoRouter(
-      initialLocation: '/onboarding',
+      // En web no hay onboarding: se entra directo al login
+      initialLocation: kIsWeb ? '/login' : '/onboarding',
       refreshListenable: GoRouterRefreshStream(authBloc.stream),
       redirect: (context, state) {
         final authState = authBloc.state;
@@ -45,38 +66,39 @@ class AppRouter {
         }
 
         if (!isPublic) return '/login';
+        if (kIsWeb && location == '/onboarding') return '/login';
         return null;
       },
       routes: [
         // --- Auth ---
-        GoRoute(
+        _route(
           path: '/onboarding',
           name: 'onboarding',
           builder: (context, state) => const OnboardingPage(),
         ),
-        GoRoute(
+        _route(
           path: '/login',
           name: 'login',
           builder: (context, state) => const LoginPage(),
         ),
-        GoRoute(
+        _route(
           path: '/register',
           name: 'register',
           builder: (context, state) => const RegisterPage(),
         ),
 
         // --- Cliente ---
-        GoRoute(
+        _route(
           path: '/client/home',
           name: 'clientHome',
           builder: (context, state) => const ClientHomePage(),
         ),
-        GoRoute(
+        _route(
           path: '/client/tiendas',
           name: 'clientTiendas',
           builder: (context, state) => const MisTiendasPage(),
         ),
-        GoRoute(
+        _route(
           path: '/client/qr',
           name: 'clientQr',
           builder: (context, state) {
@@ -87,7 +109,7 @@ class AppRouter {
             );
           },
         ),
-        GoRoute(
+        _route(
           path: '/client/history',
           name: 'clientHistory',
           builder: (context, state) {
@@ -95,32 +117,54 @@ class AppRouter {
             return TransactionHistoryPage(userId: extra['userId']!);
           },
         ),
-        GoRoute(
+        _route(
           path: '/client/scan-business',
           name: 'clientScanBusiness',
           builder: (context, state) => const ScanBusinessQrPage(),
         ),
-        GoRoute(
-          path: '/client/join',
-          name: 'clientJoinBusiness',
+        _route(
+          path: '/client/store',
+          name: 'clientStore',
           builder: (context, state) {
             final extra = state.extra as Map<String, String>;
-            return JoinBusinessPage(businessId: extra['businessId']!);
+            return StorePage(businessId: extra['businessId']!);
           },
         ),
 
         // --- Negocio ---
-        GoRoute(
+        _route(
           path: '/business/home',
           name: 'businessHome',
           builder: (context, state) => const BusinessHomePage(),
         ),
-        GoRoute(
+        _route(
           path: '/business/setup',
           name: 'businessSetup',
           builder: (context, state) => const BusinessSetupPage(),
         ),
-        GoRoute(
+        _route(
+          path: '/business/requests',
+          name: 'businessRequests',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, String>;
+            return BusinessRequestsPage(
+              businessId: extra['businessId']!,
+              businessName: extra['businessName'] ?? '',
+            );
+          },
+        ),
+        _route(
+          path: '/business/programs',
+          name: 'businessPrograms',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, String>;
+            return BusinessProgramsPage(
+              businessId: extra['businessId']!,
+              businessName: extra['businessName'] ?? '',
+            );
+          },
+        ),
+        _route(
           path: '/business/clients',
           name: 'businessClients',
           builder: (context, state) {
@@ -133,7 +177,7 @@ class AppRouter {
         ),
 
         // --- Promociones admin ---
-        GoRoute(
+        _route(
           path: '/business/promotions',
           name: 'businessPromotions',
           builder: (context, state) {
@@ -144,7 +188,7 @@ class AppRouter {
             );
           },
         ),
-        GoRoute(
+        _route(
           path: '/business/create-promotion',
           name: 'createPromotion',
           builder: (context, state) {
@@ -157,7 +201,7 @@ class AppRouter {
         ),
 
         // --- Promociones cliente ---
-        GoRoute(
+        _route(
           path: '/client/promotions',
           name: 'clientPromotions',
           builder: (context, state) {
@@ -167,23 +211,23 @@ class AppRouter {
         ),
 
         // --- Empleado ---
-        GoRoute(
+        _route(
           path: '/employee/home',
           name: 'employeeHome',
           builder: (context, state) => const EmployeeHomePage(),
         ),
-        GoRoute(
+        _route(
           path: '/employee/scanner',
           name: 'employeeScanner',
           builder: (context, state) => const QrScannerPage(),
         ),
-        GoRoute(
+        _route(
           path: '/business/scanner',
           name: 'businessScanner',
           builder: (context, state) =>
               const QrScannerPage(homeRoute: '/business/home'),
         ),
-        GoRoute(
+        _route(
           path: '/employee/accredit',
           name: 'employeeAccredit',
           builder: (context, state) {

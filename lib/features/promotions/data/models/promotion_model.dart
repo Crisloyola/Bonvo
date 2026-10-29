@@ -11,6 +11,7 @@ class PromotionModel extends Promotion {
     required super.pointsCost,
     required super.active,
     required super.createdAt,
+    super.imageBase64,
   });
 
   factory PromotionModel.fromFirestore(DocumentSnapshot doc) {
@@ -24,6 +25,7 @@ class PromotionModel extends Promotion {
       pointsCost: (data['pointsCost'] as num?)?.toInt() ?? 0,
       active: data['active'] as bool? ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      imageBase64: data['imageBase64'] as String?,
     );
   }
 
@@ -35,5 +37,6 @@ class PromotionModel extends Promotion {
         'pointsCost': pointsCost,
         'active': active,
         'createdAt': Timestamp.fromDate(createdAt),
+        if (imageBase64 != null) 'imageBase64': imageBase64,
       };
 }

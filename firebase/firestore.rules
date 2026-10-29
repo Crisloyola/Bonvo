@@ -5,12 +5,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isClient() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).exists();
-    }
-
     function isBusinessAdmin(businessId) {
-      return isAuthenticated() && get(/databases/$(database)/documents/businesses/$(businessId)).data.adminUid == request.auth.uid;
+      return isAuthenticated() && get(/databases/$(database)/documents/businesses/$(businessId)).data.adminId == request.auth.uid;
     }
 
     function isEmployee(businessId) {
@@ -18,16 +14,147 @@ service cloud.firestore {
         get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.businessId == businessId;
     }
 
+    // Negocio o empleado de CUALQUIER negocio: puede leer/acreditar puntos
+    // a un cliente aunque no sea su propio documento.
+    function callerIsStaff() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['businessAdmin', 'employee'];
+    }
+
+    // Único ascenso de rol permitido para el propio usuario: de 'client' a
+    // 'businessAdmin', y solo si el negocio recién agregado a su
+    // businessIds ya existe con adminId == este usuario (createBusiness crea
+    // el negocio primero, en un escritura aparte, antes de este update).
+    function isSelfBusinessPromotion(userId) {
+      let newIds = request.resource.data.businessIds;
+      let newBizId = newIds[newIds.size() - 1];
+      return resource.data.role == 'client' &&
+        request.resource.data.role == 'businessAdmin' &&
+        newIds.size() == resource.data.businessIds.size() + 1 &&
+        get(/databases/$(database)/documents/businesses/$(newBizId)).data.adminId == userId;
+    }
+
+    // Ascenso de 'client' a 'employee': solo si existe una invitación
+    // (employees/{userId}) creada por el negocio, apuntando al mismo
+    // businessId que se está agregando a businessIds.
+    function isSelfEmployeePromotion(userId) {
+      let newIds = request.resource.data.businessIds;
+      let newBizId = newIds[newIds.size() - 1];
+      return resource.data.role == 'client' &&
+        request.resource.data.role == 'employee' &&
+        newIds.size() == resource.data.businessIds.size() + 1 &&
+        get(/databases/$(database)/documents/employees/$(userId)).data.businessId == newBizId;
+    }
+
     match /users/{userId} {
-      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAuthenticated() && (request.auth.uid == userId || callerIsStaff());
       allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      // El propio usuario solo puede bajar o mantener sus puntos (canje) y
+      // no puede cambiar su rol, salvo los dos ascensos permitidos de arriba.
+      // El staff (negocio/empleado) puede subir los puntos de un cliente
+      // (acreditación) pero no tocar su rol ni email.
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId &&
+          request.resource.data.points <= resource.data.points &&
+          (request.resource.data.role == resource.data.role ||
+            isSelfBusinessPromotion(userId) ||
+            isSelfEmployeePromotion(userId))) ||
+        (callerIsStaff() &&
+          request.auth.uid != userId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.email == resource.data.email &&
+          request.resource.data.points >= resource.data.points)
+      );
+
       allow delete: if false;
+    }
+
+    // Solo cambió el mapa `stats` (contadores agregados) — permite que un
+    // empleado los actualice al acreditar puntos, sin poder tocar nada más
+    // del negocio (nombre, dueño, configuración, etc.).
+    function onlyStatsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stats']);
+    }
+
+    // Cualquier cliente que se inscribe suma su propio +1 a uniqueClients
+    // (nada más del documento cambia, y solo de a uno a la vez). No se
+    // puede verificar aquí que además creó su membresía —viven en
+    // escrituras separadas dentro de la misma transacción— así que se
+    // acota al máximo: un campo, un negocio, un cliente, un conteo.
+    function isValidUniqueClientIncrement() {
+      return onlyStatsChanged() &&
+        request.resource.data.stats.uniqueClients == resource.data.stats.uniqueClients + 1 &&
+        request.resource.data.stats.totalTransactions == resource.data.stats.totalTransactions &&
+        request.resource.data.stats.totalPointsIssued == resource.data.stats.totalPointsIssued &&
+        request.resource.data.stats.activePromotions == resource.data.stats.activePromotions;
+    }
+
+    // Un cliente canjeando una promoción suma su propio +1 a
+    // totalTransactions (nada más cambia). Igual de acotado que la función
+    // de arriba: un campo, un conteo, a la vez.
+    function isValidClientRedeemIncrement() {
+      return onlyStatsChanged() &&
+        request.resource.data.stats.totalTransactions == resource.data.stats.totalTransactions + 1 &&
+        request.resource.data.stats.totalPointsIssued == resource.data.stats.totalPointsIssued &&
+        request.resource.data.stats.uniqueClients == resource.data.stats.uniqueClients &&
+        request.resource.data.stats.activePromotions == resource.data.stats.activePromotions;
     }
 
     match /businesses/{businessId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isBusinessAdmin(businessId);
+      allow create: if isAuthenticated() && request.resource.data.adminId == request.auth.uid;
+      allow update: if isBusinessAdmin(businessId) ||
+        (isEmployee(businessId) && onlyStatsChanged()) ||
+        isValidUniqueClientIncrement() ||
+        isValidClientRedeemIncrement();
+      allow delete: if isBusinessAdmin(businessId);
+
+      match /members/{memberId} {
+        allow read: if isAuthenticated() &&
+          (request.auth.uid == memberId || isBusinessAdmin(businessId) || isEmployee(businessId));
+        // El cliente solo crea su propia membresía al inscribirse, SIN saldos.
+        // Los saldos (puntos, sellos, cashback) solo los cambia el negocio
+        // al aprobar solicitudes o aplicar cashback.
+        allow create: if isAuthenticated() && (
+          (request.auth.uid == memberId &&
+            request.resource.data.keys().hasOnly(['userId', 'userName', 'enrolledAt'])) ||
+          isBusinessAdmin(businessId));
+        allow update: if isBusinessAdmin(businessId);
+        allow delete: if false;
+      }
+
+      // Solicitudes del cliente (compra, canje de regalo, regalo de sellos)
+      // que el negocio aprueba o rechaza.
+      match /requests/{requestId} {
+        allow read: if isAuthenticated() &&
+          (resource.data.userId == request.auth.uid || isBusinessAdmin(businessId));
+        // Solo para sí mismo, en estado pendiente y siendo miembro de la tienda
+        allow create: if isAuthenticated() &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.type in ['purchase', 'reward', 'stampReward'] &&
+          request.resource.data.get('amountCents', 0) is int &&
+          request.resource.data.get('amountCents', 0) >= 0 &&
+          request.resource.data.get('amountCents', 0) <= 100000000 &&
+          exists(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid));
+        // Aprobar o rechazar: solo el negocio
+        allow update: if isBusinessAdmin(businessId);
+        allow delete: if false;
+      }
+
+      match /promotions/{promotionId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isBusinessAdmin(businessId);
+      }
+
+      // Avisos push (nueva promoción, etc.) que los clientes inscritos
+      // escuchan en tiempo real desde client_home_page.
+      match /announcements/{announcementId} {
+        allow read: if isAuthenticated();
+        allow create: if isBusinessAdmin(businessId) || isEmployee(businessId);
+        allow update, delete: if false;
+      }
     }
 
     match /employees/{employeeId} {
@@ -38,16 +165,12 @@ service cloud.firestore {
 
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isBusinessAdmin(resource.data.businessId) || isEmployee(resource.data.businessId));
+      // Solo el negocio registra movimientos (al aprobar solicitudes o aplicar
+      // cashback); el cliente ya no descuenta puntos por su cuenta.
       allow create: if isAuthenticated() &&
-        ((request.resource.data.userId == request.auth.uid && request.resource.data.type in ['earn', 'redeem']) ||
-        isBusinessAdmin(request.resource.data.businessId) ||
+        (isBusinessAdmin(request.resource.data.businessId) ||
         isEmployee(request.resource.data.businessId));
       allow update, delete: if false;
-    }
-
-    match /promotions/{promotionId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isBusinessAdmin(request.resource.data.businessId);
     }
 
     match /qr_codes/{qrId} {
@@ -56,3 +179,4 @@ service cloud.firestore {
     }
   }
 }
+

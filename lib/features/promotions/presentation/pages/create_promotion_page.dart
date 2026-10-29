@@ -95,6 +95,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
       pointsCost: _pointsCost,
       active: true,
       createdAt: DateTime.now(),
+      imageBase64: _bannerBase64,
     );
 
     final result =
@@ -469,7 +470,7 @@ class _HatchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFE2E8F0)
+      ..color = const Color(0xFFDCDCD6)
       ..strokeWidth = 1;
     const spacing = 14.0;
     for (double i = -size.height;
@@ -538,7 +539,7 @@ class _PointsSelector extends StatelessWidget {
           _PtsBtn(
             icon: AppIcons.minus,
             iconColor: AppColors.textSecondary,
-            bgColor: const Color(0xFFF1F5F9),
+            bgColor: const Color(0xFFF3F3EE),
             onTap: onDecrement,
           ),
           const SizedBox(width: 10),
@@ -578,7 +579,7 @@ class _PtsBtn extends StatelessWidget {
         height: 38,
         decoration: BoxDecoration(
           color: onTap == null
-              ? const Color(0xFFF1F5F9).withValues(alpha: 0.5)
+              ? const Color(0xFFF3F3EE).withValues(alpha: 0.5)
               : bgColor,
           borderRadius: BorderRadius.circular(10),
         ),

@@ -18,21 +18,67 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Bonvo - Sistema de fidelización de clientes para negocios locales.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="fidelizacion_app">
+  <meta name="apple-mobile-web-app-title" content="Bonvo">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>fidelizacion_app</title>
+  <title>Bonvo</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Adelanta la conexión al motor de Flutter (CanvasKit) y a las fuentes -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+
+  <style>
+    body { margin: 0; background: #F1F1EC; }
+    #splash {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      background: #F1F1EC;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      transition: opacity .25s ease;
+    }
+    #splash .logo {
+      width: 64px; height: 64px; border-radius: 18px;
+      background: linear-gradient(145deg, #9B6BFF, #7C3AED 45%, #5B21B6);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 12px 24px -10px rgba(124, 58, 237, .5);
+    }
+    #splash .name { font-size: 22px; font-weight: 800; color: #0F0F0E; letter-spacing: -.5px; }
+    #splash .bar {
+      width: 120px; height: 3px; border-radius: 3px;
+      background: #E0E0D8; overflow: hidden;
+    }
+    #splash .bar::after {
+      content: ""; display: block; width: 40%; height: 100%;
+      background: #7C3AED; border-radius: 3px;
+      animation: load 1.1s ease-in-out infinite;
+    }
+    @keyframes load { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  </style>
 </head>
 <body>
+  <!-- Pantalla de carga mientras se descarga la app; se quita al arrancar Flutter -->
+  <div id="splash">
+    <div class="logo">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+        <path d="M21.41 11.58l-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7A1.5 1.5 0 1 1 7 5.5 1.5 1.5 0 0 1 5.5 7z"/>
+      </svg>
+    </div>
+    <div class="name">Bonvo</div>
+    <div class="bar"></div>
+  </div>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

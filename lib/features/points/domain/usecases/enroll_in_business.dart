@@ -13,6 +13,14 @@ class EnrollInBusiness implements UseCase<Unit, EnrollParams> {
   @override
   Future<Either<Failure, Unit>> call(EnrollParams params) async {
     try {
+      final memberRef = _firestore
+          .collection('businesses')
+          .doc(params.businessId)
+          .collection('members')
+          .doc(params.userId);
+      // Si ya era miembro no se toca su documento: guarda sus saldos
+      final alreadyMember = (await memberRef.get()).exists;
+
       final batch = _firestore.batch();
 
       // 1. Agrega el negocio al perfil del cliente
@@ -21,19 +29,14 @@ class EnrollInBusiness implements UseCase<Unit, EnrollParams> {
         {'businessIds': FieldValue.arrayUnion([params.businessId])},
       );
 
-      // 2. Crea o actualiza el doc de membresía en la subcolección del negocio
-      batch.set(
-        _firestore
-            .collection('businesses')
-            .doc(params.businessId)
-            .collection('members')
-            .doc(params.userId),
-        {
+      // 2. Crea el doc de membresía (saldos por tienda, empiezan en 0)
+      if (!alreadyMember) {
+        batch.set(memberRef, {
           'userId': params.userId,
+          'userName': params.userName,
           'enrolledAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+        });
+      }
 
       await batch.commit();
       return const Right(unit);
@@ -46,7 +49,12 @@ class EnrollInBusiness implements UseCase<Unit, EnrollParams> {
 class EnrollParams extends Equatable {
   final String userId;
   final String businessId;
-  const EnrollParams({required this.userId, required this.businessId});
+  final String userName;
+  const EnrollParams({
+    required this.userId,
+    required this.businessId,
+    this.userName = '',
+  });
   @override
   List<Object?> get props => [userId, businessId];
 }

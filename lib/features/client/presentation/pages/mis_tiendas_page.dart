@@ -4,13 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/business/domain/entities/business.dart';
+import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
 import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
-import 'package:bonvo/features/points/domain/entities/transaction.dart';
-import 'package:bonvo/features/points/domain/repositories/points_repository.dart';
+import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
+import 'package:bonvo/features/loyalty/domain/loyalty.dart';
 import 'package:bonvo/injection/injection.dart';
 
 class MisTiendasPage extends StatelessWidget {
@@ -39,7 +41,7 @@ class _MisTiendasView extends StatefulWidget {
 
 class _MisTiendasViewState extends State<_MisTiendasView> {
   List<Business> _businesses = [];
-  Map<String, int> _pointsByBusiness = {};
+  Map<String, Membership> _members = {};
   Position? _position;
   String _search = '';
   bool _loading = true;
@@ -58,18 +60,14 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
       r.fold((_) {}, (b) => businesses.add(b));
     }
 
-    // 2. Calcular puntos por negocio desde transacciones
-    final txResult = await getIt<PointsRepository>()
-        .getUserTransactions(widget.user.uid);
-    final Map<String, int> pointsByBiz = {};
-    txResult.fold((_) {}, (txs) {
-      for (final tx in txs) {
-        final delta =
-            tx.type == TransactionType.earn ? tx.points : -tx.points;
-        pointsByBiz[tx.businessId] =
-            (pointsByBiz[tx.businessId] ?? 0) + delta;
-      }
-    });
+    // 2. Saldos del cliente en cada tienda
+    final members = <String, Membership>{};
+    for (final b in businesses) {
+      final m = await getIt<LoyaltyRepository>()
+          .watchMembership(b.id, widget.user.uid)
+          .first;
+      if (m != null) members[b.id] = m;
+    }
 
     // 3. Posición GPS
     Position? pos;
@@ -89,7 +87,7 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
     if (mounted) {
       setState(() {
         _businesses = businesses;
-        _pointsByBusiness = pointsByBiz;
+        _members = members;
         _position = pos;
         _loading = false;
       });
@@ -118,11 +116,10 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
 
   List<Business> get _nearby {
     return _filtered.where((b) {
-          final d = _distanceTo(b);
-          return d != null && d <= 2000;
-        }).toList()
-      ..sort((a, b) =>
-          (_distanceTo(a) ?? 0).compareTo(_distanceTo(b) ?? 0));
+      final d = _distanceTo(b);
+      return d != null && d <= 2000;
+    }).toList()
+      ..sort((a, b) => (_distanceTo(a) ?? 0).compareTo(_distanceTo(b) ?? 0));
   }
 
   List<Business> get _rest {
@@ -132,6 +129,135 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
 
   @override
   Widget build(BuildContext context) {
+    final wide = context.isWide;
+
+    // En escritorio las tiendas van en cuadrícula; en celular, en lista
+    List<Widget> tilesFor(List<Business> list) {
+      final tiles = list
+          .map((b) => _BusinessTile(
+                business: b,
+                member: _members[b.id],
+                distance: _distanceTo(b),
+              ))
+          .toList();
+      if (!wide) return tiles;
+      // _BusinessTile ya trae su margen inferior
+      return [
+        ResponsiveWrapGrid(
+            minItemWidth: 360, spacing: 16, runSpacing: 0, children: tiles),
+      ];
+    }
+
+    final body = Column(
+      children: [
+        // ── Header ──
+        Container(
+          color: Colors.white,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
+              child: Row(
+                children: [
+                  const Text(
+                    'Mis tiendas',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => context.push('/client/scan-business'),
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.add_rounded,
+                          color: Colors.white, size: 24),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // ── Buscador ──
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          alignment: Alignment.centerLeft,
+          child: Container(
+            height: 44,
+            constraints: BoxConstraints(maxWidth: wide ? 420 : double.infinity),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: TextField(
+              onChanged: (v) => setState(() => _search = v),
+              style:
+                  const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Buscar negocio...',
+                hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: AppColors.textMuted, size: 20),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Lista ──
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _filtered.isEmpty
+                  ? _EmptyState(hasSearch: _search.isNotEmpty)
+                  : ListView(
+                      padding: wide
+                          ? const EdgeInsets.fromLTRB(32, 24, 32, 32)
+                          : const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      children: [
+                        if (_nearby.isNotEmpty) ...[
+                          const _SectionLabel(
+                            label: 'CERCA DE TI',
+                            icon: Icons.location_on_rounded,
+                          ),
+                          const SizedBox(height: 10),
+                          ...tilesFor(_nearby),
+                          const SizedBox(height: 6),
+                        ],
+                        if (_rest.isNotEmpty) ...[
+                          const _SectionLabel(label: 'TODAS'),
+                          const SizedBox(height: 10),
+                          ...tilesFor(_rest),
+                        ],
+                      ],
+                    ),
+        ),
+      ],
+    );
+
+    if (wide) {
+      return ClientWebShell(
+        current: ClientSection.stores,
+        user: widget.user,
+        child: body,
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton(
@@ -158,115 +284,7 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
         ),
         onPerfil: () {},
       ),
-      body: Column(
-        children: [
-          // ── Header ──
-          Container(
-            color: Colors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Mis tiendas',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => context.push('/client/scan-business'),
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.add_rounded,
-                            color: Colors.white, size: 24),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Buscador ──
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: TextField(
-                onChanged: (v) => setState(() => _search = v),
-                style: const TextStyle(
-                    fontSize: 14, color: AppColors.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Buscar negocio...',
-                  hintStyle: TextStyle(
-                      color: AppColors.textMuted, fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      color: AppColors.textMuted, size: 20),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Lista ──
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
-                    ? _EmptyState(hasSearch: _search.isNotEmpty)
-                    : ListView(
-                        padding:
-                            const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                        children: [
-                          if (_nearby.isNotEmpty) ...[
-                            const _SectionLabel(
-                              label: 'CERCA DE TI',
-                              icon: Icons.location_on_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            ..._nearby.map((b) => _BusinessTile(
-                                  business: b,
-                                  points:
-                                      _pointsByBusiness[b.id] ?? 0,
-                                  distance: _distanceTo(b),
-                                )),
-                            const SizedBox(height: 6),
-                          ],
-                          if (_rest.isNotEmpty) ...[
-                            const _SectionLabel(label: 'TODAS'),
-                            const SizedBox(height: 10),
-                            ..._rest.map((b) => _BusinessTile(
-                                  business: b,
-                                  points:
-                                      _pointsByBusiness[b.id] ?? 0,
-                                  distance: _distanceTo(b),
-                                )),
-                          ],
-                        ],
-                      ),
-          ),
-        ],
-      ),
+      body: body,
     );
   }
 }
@@ -303,28 +321,28 @@ class _SectionLabel extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────
 class _BusinessTile extends StatelessWidget {
   final Business business;
-  final int points;
+  final Membership? member;
   final double? distance;
 
   const _BusinessTile({
     required this.business,
-    required this.points,
+    required this.member,
     this.distance,
   });
 
   static const _gradients = [
     LinearGradient(
-      colors: [Color(0xFF065F46), Color(0xFF059669)],
+      colors: [Color(0xFF5B21B6), Color(0xFF7C3AED)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
     LinearGradient(
-      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+      colors: [Color(0xFF5B21B6), Color(0xFF9B6BFF)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
     LinearGradient(
-      colors: [Color(0xFF7C2D12), Color(0xFFEA580C)],
+      colors: [Color(0xFF0F0F0E), Color(0xFF2A2A27)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
@@ -334,12 +352,12 @@ class _BusinessTile extends StatelessWidget {
       end: Alignment.bottomRight,
     ),
     LinearGradient(
-      colors: [Color(0xFF881337), Color(0xFFE11D48)],
+      colors: [Color(0xFF881337), Color(0xFFD1343A)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
     LinearGradient(
-      colors: [Color(0xFF134E4A), Color(0xFF0D9488)],
+      colors: [Color(0xFF15131C), Color(0xFF7C3AED)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
@@ -364,15 +382,21 @@ class _BusinessTile extends StatelessWidget {
     }
     if (t.contains('pizza')) return Icons.local_pizza_rounded;
     if (t.contains('jug') || t.contains('frut')) return Icons.local_bar_rounded;
-    if (t.contains('rest') || t.contains('comid')) return Icons.restaurant_rounded;
-    if (t.contains('ropa') || t.contains('moda')) return Icons.shopping_bag_rounded;
+    if (t.contains('rest') || t.contains('comid')) {
+      return Icons.restaurant_rounded;
+    }
+    if (t.contains('ropa') || t.contains('moda')) {
+      return Icons.shopping_bag_rounded;
+    }
     return _defaultIcons[_idx];
   }
 
   String get _category {
     final t =
         '${business.name.toLowerCase()} ${business.description.toLowerCase()}';
-    if (t.contains('café') || t.contains('coffee') || t.contains('cafet')) return 'Cafetería';
+    if (t.contains('café') || t.contains('coffee') || t.contains('cafet')) {
+      return 'Cafetería';
+    }
     if (t.contains('pizza')) return 'Pizzería';
     if (t.contains('jug') || t.contains('frut')) return 'Juguería';
     if (t.contains('rest') || t.contains('comid')) return 'Restaurante';
@@ -393,19 +417,27 @@ class _BusinessTile extends StatelessWidget {
     return '$pts';
   }
 
-  String get _cashback {
-    final soles = points / 100.0;
-    return 'S/ ${soles.toStringAsFixed(2)}';
+  /// Saldo principal del tile según los programas de la tienda.
+  (String, String) get _mainBalance {
+    final p = business.programs;
+    final m = member;
+    if (p.pointsEnabled) return (_formatPts(m?.points ?? 0), 'PUNTOS');
+    if (p.stampsEnabled) {
+      return ('${m?.stamps ?? 0}/${p.stampsRequired}', 'SELLOS');
+    }
+    if (p.cashbackEnabled) {
+      return (formatSoles(m?.cashbackCents ?? 0), 'CASHBACK');
+    }
+    return ('—', '');
   }
-
-  // Progreso hacia el próximo nivel de cashback (cada 500 pts = S/5.00)
-  static const int _levelSize = 500;
-  int get _pointsInLevel => points % _levelSize;
-  double get _progress => _pointsInLevel / _levelSize;
-  int get _ptsToNext => _levelSize - _pointsInLevel;
 
   @override
   Widget build(BuildContext context) {
+    final p = business.programs;
+    final (mainValue, mainLabel) = _mainBalance;
+    final stamps = member?.stamps ?? 0;
+    final stampRewards = member?.stampRewards ?? 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -421,189 +453,161 @@ class _BusinessTile extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.cardLg),
-        child: Column(
-          children: [
-            // ── Header degradado ──
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppRadius.cardLg)),
-              child: Stack(
-                children: [
-                  // Banner de fondo cuando existe
-                  if (business.bannerBase64 != null)
-                    Positioned.fill(
-                      child: Image.memory(
-                        base64Decode(business.bannerBase64!),
-                        fit: BoxFit.cover,
+        child: Material(
+          color: Colors.white,
+          child: InkWell(
+            onTap: () => context
+                .push('/client/store', extra: {'businessId': business.id}),
+            child: Column(
+              children: [
+                // ── Header ──
+                Stack(
+                  children: [
+                    if (business.bannerBase64 != null)
+                      Positioned.fill(
+                        child: Image.memory(
+                          base64Decode(business.bannerBase64!),
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                    decoration: BoxDecoration(
-                      gradient: business.bannerBase64 != null
-                          ? LinearGradient(
-                              colors: [
-                                Colors.black.withValues(alpha: 0.55),
-                                Colors.black.withValues(alpha: 0.35),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            )
-                          : _gradient,
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            // Logo o ícono
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: business.logoBase64 != null
-                                  ? Image.memory(
-                                      base64Decode(business.logoBase64!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Icon(_icon, color: Colors.white, size: 22),
-                            ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              business.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Text(
-                                  _category,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 12,
-                                  ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                      decoration: BoxDecoration(
+                        gradient: business.bannerBase64 != null
+                            ? LinearGradient(
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.55),
+                                  Colors.black.withValues(alpha: 0.35),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : _gradient,
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                if (distance != null) ...[
+                                clipBehavior: Clip.antiAlias,
+                                child: business.logoBase64 != null
+                                    ? Image.memory(
+                                        base64Decode(business.logoBase64!),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Icon(_icon,
+                                        color: Colors.white, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      business.name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      distance != null
+                                          ? '$_category · ${_formatDist(distance!)}'
+                                          : _category,
+                                      style: TextStyle(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
                                   Text(
-                                    ' · ',
-                                    style: TextStyle(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.5),
-                                        fontSize: 12),
+                                    mainValue,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -1,
+                                      height: 1,
+                                    ),
                                   ),
-                                  Icon(Icons.location_on_rounded,
-                                      size: 11,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.75)),
-                                  const SizedBox(width: 2),
                                   Text(
-                                    _formatDist(distance!),
+                                    mainLabel,
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.75),
-                                      fontSize: 12,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.65),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.0,
                                     ),
                                   ),
                                 ],
+                              ),
+                            ],
+                          ),
+                          // Progreso de la tarjeta de sellos
+                          if (p.stampsEnabled) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    stampRewards > 0
+                                        ? '🎁 Tienes un regalo por reclamar'
+                                        : 'Faltan ${p.stampsRequired - stamps} '
+                                            'visitas para: ${p.stampReward}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.85),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: stamps / p.stampsRequired,
+                                minHeight: 6,
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.2),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Colors.white),
+                              ),
+                            ),
                           ],
-                        ),
-                      ),
-                      // Puntos grandes
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            _formatPts(points),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
-                              height: 1,
-                            ),
-                          ),
-                          Text(
-                            'PUNTOS',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.65),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
                         ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Barra de progreso
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Faltan $_ptsToNext pts para tu próximo cashback',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            'S/ 5.00',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          minHeight: 6,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                              Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-                ],
-              ),
-            ),
+                    ),
+                  ],
+                ),
 
-            // ── Footer blanco: cashback + config ──
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Cashback disponible
-                  Expanded(
-                    child: Row(
-                      children: [
+                // ── Footer: cashback real + entrar a la tienda ──
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      if (p.cashbackEnabled) ...[
                         Container(
                           width: 32,
                           height: 32,
@@ -627,7 +631,7 @@ class _BusinessTile extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              _cashback,
+                              formatSoles(member?.cashbackCents ?? 0),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -637,62 +641,31 @@ class _BusinessTile extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-
-                  // Divisor
-                  Container(
-                    width: 1,
-                    height: 32,
-                    color: AppColors.border,
-                  ),
-
-                  // Pts por sol
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text(
-                              'Ganás por S/ 1.00',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '${business.pointsPerSol} pt${business.pointsPerSol != 1 ? 's' : ''}',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
+                      ] else
+                        Text(
+                          member == null
+                              ? 'Toca para ver la tienda'
+                              : '${member!.visits} compras registradas',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.greenTint,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.star_border_rounded,
-                              color: AppColors.primary, size: 16),
+                      const Spacer(),
+                      const Text(
+                        'Ver tienda',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
                         ),
-                      ],
-                    ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.primary),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -724,9 +697,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              hasSearch
-                  ? 'Sin resultados'
-                  : 'No tienes tiendas inscritas',
+              hasSearch ? 'Sin resultados' : 'No tienes tiendas inscritas',
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -740,8 +711,8 @@ class _EmptyState extends StatelessWidget {
               hasSearch
                   ? 'Intenta con otro nombre'
                   : 'Toca el botón + para unirte a tu primera tienda',
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style:
+                  const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],

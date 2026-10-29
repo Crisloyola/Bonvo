@@ -59,7 +59,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                         Container(
                           width: 80,
                           height: 80,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppColors.greenTint,
                             shape: BoxShape.circle,
                           ),

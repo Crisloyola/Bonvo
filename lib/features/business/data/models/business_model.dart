@@ -1,28 +1,20 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bonvo/features/business/domain/entities/business.dart';
+import 'package:bonvo/features/loyalty/domain/loyalty.dart';
 
 class BusinessModel extends Business {
   const BusinessModel({
-    required String id,
-    required String name,
-    required String adminId,
-    String description = '',
-    int pointsPerSol = 1,
-    double? latitude,
-    double? longitude,
-    String? bannerBase64,
-    String? logoBase64,
-  }) : super(
-          id: id,
-          name: name,
-          adminId: adminId,
-          description: description,
-          pointsPerSol: pointsPerSol,
-          latitude: latitude,
-          longitude: longitude,
-          bannerBase64: bannerBase64,
-          logoBase64: logoBase64,
-        );
+    required super.id,
+    required super.name,
+    required super.adminId,
+    super.description,
+    super.pointsPerSol,
+    super.latitude,
+    super.longitude,
+    super.bannerBase64,
+    super.logoBase64,
+    super.programs,
+  });
 
   factory BusinessModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -36,6 +28,10 @@ class BusinessModel extends Business {
       longitude: (data['longitude'] as num?)?.toDouble(),
       bannerBase64: data['bannerBase64'] as String?,
       logoBase64: data['logoBase64'] as String?,
+      programs: LoyaltyPrograms.fromMap(
+        (data['programs'] as Map?)?.cast<String, dynamic>(),
+        legacyPointsPerSol: (data['pointsPerSol'] as num?)?.toInt() ?? 1,
+      ),
     );
   }
 

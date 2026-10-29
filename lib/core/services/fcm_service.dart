@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:bonvo/config/routes/app_router.dart';
 import 'package:bonvo/core/services/notification_service.dart';
@@ -18,6 +19,9 @@ class FcmService {
   );
 
   Future<void> init(String userId) async {
+    // La versión web no usa push
+    if (kIsWeb) return;
+
     // Pide permiso en iOS/Android 13+
     await _messaging.requestPermission(
       alert: true,
@@ -72,10 +76,12 @@ class FcmService {
   }
 
   Future<void> subscribeToBusinessTopic(String businessId) async {
+    if (kIsWeb) return; // los topics no existen en web
     await _messaging.subscribeToTopic('biz_$businessId');
   }
 
   Future<void> unsubscribeFromBusinessTopic(String businessId) async {
+    if (kIsWeb) return;
     await _messaging.unsubscribeFromTopic('biz_$businessId');
   }
 

@@ -110,11 +110,11 @@ class _PointsAccreditationPageState extends State<PointsAccreditationPage> {
       _clientName.isNotEmpty ? _clientName[0].toUpperCase() : '?';
 
   static const _avatarColors = [
-    Color(0xFFF59E0B),
-    Color(0xFF10B981),
-    Color(0xFF6366F1),
-    Color(0xFFEF4444),
-    Color(0xFF8B5CF6),
+    Color(0xFF2A2A27),
+    Color(0xFF9B6BFF),
+    Color(0xFF7C3AED),
+    Color(0xFFE5484D),
+    Color(0xFF9B6BFF),
   ];
 
   Color get _avatarColor =>
@@ -410,7 +410,7 @@ class _ClientCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFD1FAE5), Color(0xFFA7F3D0)],
+          colors: [Color(0xFFEDE5FF), Color(0xFFC4A6FF)],
         ),
         borderRadius: BorderRadius.circular(AppRadius.cardLg),
         border: Border.all(color: AppColors.greenBorder),
@@ -484,7 +484,7 @@ class _ClientCardSkeleton extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFD1FAE5),
+        color: const Color(0xFFEDE5FF),
         borderRadius: BorderRadius.circular(AppRadius.cardLg),
         border: Border.all(color: AppColors.greenBorder),
       ),
@@ -492,7 +492,7 @@ class _ClientCardSkeleton extends StatelessWidget {
         children: [
           const CircleAvatar(
             radius: 24,
-            backgroundColor: Color(0xFFA7F3D0),
+            backgroundColor: Color(0xFFC4A6FF),
           ),
           const SizedBox(width: 14),
           Column(
@@ -502,7 +502,7 @@ class _ClientCardSkeleton extends StatelessWidget {
                   width: 140,
                   height: 14,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFA7F3D0),
+                    color: const Color(0xFFC4A6FF),
                     borderRadius: BorderRadius.circular(7),
                   )),
               const SizedBox(height: 6),
@@ -510,7 +510,7 @@ class _ClientCardSkeleton extends StatelessWidget {
                   width: 100,
                   height: 11,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFA7F3D0),
+                    color: const Color(0xFFC4A6FF),
                     borderRadius: BorderRadius.circular(5),
                   )),
             ],

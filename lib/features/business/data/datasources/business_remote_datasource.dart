@@ -26,6 +26,49 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
 
   BusinessRemoteDataSourceImpl(this._firestore);
 
+  /// El dueño y los empleados tienen el negocio en businessIds, pero no
+  /// cuentan como clientes.
+  static bool _isCustomer(Map<String, dynamic> user) =>
+      user['role'] != 'businessAdmin' && user['role'] != 'employee';
+
+  /// Consultas en curso, para que stats y clientes (que se piden a la vez)
+  /// compartan la misma descarga en vez de repetirla.
+  final Map<String, Future<QuerySnapshot<Map<String, dynamic>>>> _inFlight =
+      {};
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _shared(
+    String key,
+    Query<Map<String, dynamic>> query,
+  ) {
+    // Ojo: el callback de whenComplete no debe devolver el Future que se
+    // quita del mapa (remove lo devuelve); si lo hace, el Future se espera a
+    // sí mismo y nunca termina.
+    return _inFlight.putIfAbsent(
+      key,
+      () => query.get().whenComplete(() {
+        _inFlight.remove(key);
+      }),
+    );
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _enrolledUsers(
+          String businessId) =>
+      _shared(
+        'users:$businessId',
+        _firestore
+            .collection('users')
+            .where('businessIds', arrayContains: businessId),
+      );
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _businessTransactions(
+          String businessId) =>
+      _shared(
+        'tx:$businessId',
+        _firestore
+            .collection('transactions')
+            .where('businessId', isEqualTo: businessId),
+      );
+
   @override
   Future<BusinessModel> createBusiness({
     required String adminId,
@@ -76,37 +119,38 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
   @override
   Future<BusinessStats> getBusinessStats(String businessId) async {
     try {
-      // Cuenta usuarios que tienen este negocio en su array businessIds
-      final enrolledSnap = await _firestore
-          .collection('users')
-          .where('businessIds', arrayContains: businessId)
-          .get();
-
-      final txSnap = await _firestore
-          .collection('transactions')
-          .where('businessId', isEqualTo: businessId)
-          .get();
-
-      int totalPoints = 0;
-      for (final doc in txSnap.docs) {
-        final data = doc.data();
-        final pts = (data['points'] as num?)?.toInt() ?? 0;
-        if (data['type'] == 'earn') totalPoints += pts;
-      }
-
-      final promoSnap = await _firestore
+      // Usuarios inscritos, transacciones y promociones en paralelo
+      final enrolledFuture = _enrolledUsers(businessId);
+      final txFuture = _businessTransactions(businessId);
+      final promoFuture = _firestore
           .collection('businesses')
           .doc(businessId)
           .collection('promotions')
           .get();
+
+      final enrolledSnap = await enrolledFuture;
+      final txSnap = await txFuture;
+      final promoSnap = await promoFuture;
+
+      int totalPoints = 0;
+      int cashbackCents = 0;
+      for (final doc in txSnap.docs) {
+        final data = doc.data();
+        if (data['type'] != 'earn') continue;
+        totalPoints += (data['points'] as num?)?.toInt() ?? 0;
+        cashbackCents += (data['cashbackCents'] as num?)?.toInt() ?? 0;
+      }
+
       final activePromos =
           promoSnap.docs.where((d) => d.data()['active'] == true).length;
 
       return BusinessStats(
         totalTransactions: txSnap.docs.length,
         totalPointsIssued: totalPoints,
-        uniqueClients: enrolledSnap.docs.length,
+        uniqueClients:
+            enrolledSnap.docs.where((d) => _isCustomer(d.data())).length,
         activePromotions: activePromos,
+        cashbackIssuedCents: cashbackCents,
       );
     } catch (e) {
       throw ServerException(e.toString());
@@ -116,18 +160,14 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
   @override
   Future<List<ClientSummary>> getBusinessClients(String businessId) async {
     try {
-      // Busca usuarios inscritos via businessIds array
-      final enrolledSnap = await _firestore
-          .collection('users')
-          .where('businessIds', arrayContains: businessId)
-          .get();
+      // Usuarios inscritos (via businessIds) y transacciones en paralelo
+      final enrolledFuture = _enrolledUsers(businessId);
+      final txFuture = _businessTransactions(businessId);
 
+      final enrolledSnap = await enrolledFuture;
       if (enrolledSnap.docs.isEmpty) return [];
 
-      final txSnap = await _firestore
-          .collection('transactions')
-          .where('businessId', isEqualTo: businessId)
-          .get();
+      final txSnap = await txFuture;
 
       final Map<String, int> txCount = {};
       final Map<String, DateTime> lastVisit = {};
@@ -143,7 +183,7 @@ class BusinessRemoteDataSourceImpl implements BusinessRemoteDataSource {
       }
 
       final summaries = <ClientSummary>[];
-      for (final doc in enrolledSnap.docs) {
+      for (final doc in enrolledSnap.docs.where((d) => _isCustomer(d.data()))) {
         final uid = doc.id;
         final data = doc.data();
         summaries.add(ClientSummary(

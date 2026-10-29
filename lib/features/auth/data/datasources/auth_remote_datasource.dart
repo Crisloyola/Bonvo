@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:bonvo/core/errors/exceptions.dart';
 import 'package:bonvo/features/auth/data/models/auth_user_model.dart';
@@ -18,12 +19,13 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
   final FirebaseFirestore _firestore;
-  final GoogleSignIn _googleSignIn;
+  /// Null en web: allí el login con Google usa el popup de Firebase.
+  final GoogleSignIn? _googleSignIn;
 
   AuthRemoteDataSourceImpl({
     required FirebaseAuth firebaseAuth,
     required FirebaseFirestore firestore,
-    required GoogleSignIn googleSignIn,
+    GoogleSignIn? googleSignIn,
   })  : _firebaseAuth = firebaseAuth,
         _firestore = firestore,
         _googleSignIn = googleSignIn;
@@ -111,15 +113,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<AuthUserModel> loginWithGoogle() async {
     try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) throw const AuthException('Inicio con Google cancelado.');
+      final UserCredential userCredential;
+      if (kIsWeb) {
+        // En web Firebase abre su propio popup de Google
+        userCredential =
+            await _firebaseAuth.signInWithPopup(GoogleAuthProvider());
+      } else {
+        final googleUser = await _googleSignIn!.signIn();
+        if (googleUser == null) throw const AuthException('Inicio con Google cancelado.');
 
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+        final googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        userCredential = await _firebaseAuth.signInWithCredential(credential);
+      }
       final uid = userCredential.user!.uid;
 
       // Si el usuario es nuevo, crear documento en Firestore
@@ -148,7 +157,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> logout() async {
     await Future.wait([
       _firebaseAuth.signOut(),
-      _googleSignIn.signOut(),
+      if (_googleSignIn != null) _googleSignIn!.signOut(),
     ]);
   }
 
@@ -173,6 +182,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return 'No existe una cuenta con este correo.';
       case 'wrong-password':
         return 'Contraseña incorrecta.';
+      // Firebase ya no distingue usuario/contraseña: devuelve este código
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Correo o contraseña incorrectos.';
+      case 'user-disabled':
+        return 'Esta cuenta está deshabilitada.';
       case 'email-already-in-use':
         return 'Este correo ya está registrado.';
       case 'invalid-email':

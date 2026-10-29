@@ -1,5 +1,6 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:bonvo/core/services/storage_service.dart';
@@ -26,6 +27,7 @@ import 'package:bonvo/features/points/domain/repositories/points_repository.dart
 import 'package:bonvo/features/points/domain/usecases/earn_points.dart';
 import 'package:bonvo/features/points/domain/usecases/enroll_in_business.dart';
 import 'package:bonvo/features/points/domain/usecases/get_user_transactions.dart';
+import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/promotions/data/datasources/promotions_datasource.dart';
 import 'package:bonvo/features/promotions/data/repositories/promotions_repository_impl.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
@@ -36,7 +38,10 @@ Future<void> configureDependencies() async {
   // --- Firebase ---
   getIt.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   getIt.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
-  getIt.registerLazySingleton<GoogleSignIn>(() => GoogleSignIn());
+  // En web no se usa (login con popup de Firebase) y sin clientId falla al iniciar
+  if (!kIsWeb) {
+    getIt.registerLazySingleton<GoogleSignIn>(() => GoogleSignIn());
+  }
 
   // --- Storage service ---
   getIt.registerLazySingleton<StorageService>(() => StorageService());
@@ -46,7 +51,7 @@ Future<void> configureDependencies() async {
     () => AuthRemoteDataSourceImpl(
       firebaseAuth: getIt<FirebaseAuth>(),
       firestore: getIt<FirebaseFirestore>(),
-      googleSignIn: getIt<GoogleSignIn>(),
+      googleSignIn: kIsWeb ? null : getIt<GoogleSignIn>(),
     ),
   );
 
@@ -108,6 +113,11 @@ Future<void> configureDependencies() async {
   // --- Enroll use case (usa Firestore directamente) ---
   getIt.registerLazySingleton(
     () => EnrollInBusiness(getIt<FirebaseFirestore>()),
+  );
+
+  // --- Programas de fidelización, saldos y solicitudes ---
+  getIt.registerLazySingleton<LoyaltyRepository>(
+    () => LoyaltyRepository(getIt<FirebaseFirestore>()),
   );
 
   // --- Promotions ---

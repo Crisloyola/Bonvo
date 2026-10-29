@@ -1,26 +1,17 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 import 'package:bonvo/features/points/domain/entities/transaction.dart';
 
 class TransactionModel extends Transaction {
   const TransactionModel({
-    required String id,
-    required String userId,
-    required String businessId,
-    required String businessName,
-    required TransactionType type,
-    required double amount,
-    required int points,
-    required DateTime timestamp,
-  }) : super(
-          id: id,
-          userId: userId,
-          businessId: businessId,
-          businessName: businessName,
-          type: type,
-          amount: amount,
-          points: points,
-          timestamp: timestamp,
-        );
+    required super.id,
+    required super.userId,
+    required super.businessId,
+    required super.businessName,
+    required super.type,
+    required super.amount,
+    required super.points,
+    required super.timestamp,
+  });
 
   factory TransactionModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -29,9 +20,12 @@ class TransactionModel extends Transaction {
       userId: data['userId'] as String,
       businessId: data['businessId'] as String,
       businessName: data['businessName'] as String? ?? '',
-      type: data['type'] == 'redeem' ? TransactionType.redeem : TransactionType.earn,
-      amount: (data['amount'] as num).toDouble(),
-      points: (data['points'] as num).toInt(),
+      type: TransactionType.values.firstWhere(
+        (t) => t.name == data['type'],
+        orElse: () => TransactionType.earn,
+      ),
+      amount: (data['amount'] as num?)?.toDouble() ?? 0,
+      points: (data['points'] as num?)?.toInt() ?? 0,
       timestamp: (data['timestamp'] as Timestamp).toDate(),
     );
   }

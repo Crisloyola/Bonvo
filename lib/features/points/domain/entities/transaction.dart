@@ -1,6 +1,15 @@
 import 'package:equatable/equatable.dart';
 
-enum TransactionType { earn, redeem }
+enum TransactionType {
+  earn,
+  redeem,
+
+  /// Entrega del regalo de la tarjeta de sellos
+  stampReward,
+
+  /// El negocio descontó saldo de cashback
+  cashbackUse,
+}
 
 class Transaction extends Equatable {
   final String id;

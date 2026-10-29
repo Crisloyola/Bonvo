@@ -41,6 +41,8 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
+    // En web solo se usa la lista interna (campana), sin notificaciones del sistema
+    if (kIsWeb) return;
 
     await _local
         .resolvePlatformSpecificImplementation<
@@ -69,6 +71,7 @@ class NotificationService {
     items.insert(0, item);
     if (items.length > 20) items.removeLast();
     unreadCount.value++;
+    if (kIsWeb) return;
 
     AndroidBitmap<Object>? largeIcon;
     if (item.logoBase64 != null) {

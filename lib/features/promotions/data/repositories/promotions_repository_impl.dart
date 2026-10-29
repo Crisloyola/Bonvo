@@ -21,6 +21,7 @@ class PromotionsRepositoryImpl implements PromotionsRepository {
         pointsCost: p.pointsCost,
         active: p.active,
         createdAt: p.createdAt,
+        imageBase64: p.imageBase64,
       );
       await _remote.createPromotion(model);
       return const Right(unit);

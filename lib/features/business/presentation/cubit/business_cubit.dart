@@ -62,16 +62,22 @@ class BusinessCubit extends Cubit<BusinessState> {
         _createBusiness = createBusiness,
         super(const BusinessInitial());
 
-  Future<void> loadBusiness(String businessId) async {
-    emit(const BusinessLoading());
+  /// [silent]: actualiza los datos sin mostrar la pantalla de carga.
+  Future<void> loadBusiness(String businessId, {bool silent = false}) async {
+    if (!silent) emit(const BusinessLoading());
 
-    final businessResult = await _repository.getBusiness(businessId);
+    // Las tres consultas van en paralelo (antes eran secuenciales)
+    final businessFuture = _repository.getBusiness(businessId);
+    final statsFuture = _repository.getBusinessStats(businessId);
+    final clientsFuture = _repository.getBusinessClients(businessId);
+
+    final businessResult = await businessFuture;
+    final statsResult = await statsFuture;
+    final clientsResult = await clientsFuture;
+
     businessResult.fold(
       (failure) => emit(BusinessError(failure.message)),
-      (business) async {
-        final statsResult = await _repository.getBusinessStats(businessId);
-        final clientsResult = await _repository.getBusinessClients(businessId);
-
+      (business) {
         final stats = statsResult.fold(
           (_) => const BusinessStats(
               totalTransactions: 0, totalPointsIssued: 0, uniqueClients: 0),
