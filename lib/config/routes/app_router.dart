@@ -29,6 +29,21 @@ import 'package:bonvo/features/promotions/presentation/pages/promotions_admin_pa
 
 const _publicRoutes = ['/login', '/register', '/onboarding'];
 
+/// Rutas que necesitan datos de la pantalla anterior (`extra`). Si se abren
+/// sin ellos (p. ej. pegando el enlace), se vuelve al inicio del usuario.
+const _routesWithExtra = {
+  '/client/qr',
+  '/client/history',
+  '/client/store',
+  '/client/promotions',
+  '/business/clients',
+  '/business/promotions',
+  '/business/create-promotion',
+  '/business/requests',
+  '/business/programs',
+  '/employee/accredit',
+};
+
 /// Datos pasados entre pantallas (`extra`). En web go_router los guarda en el
 /// historial del navegador y al reconstruir la ruta vuelven como
 /// Map<String, dynamic>, así que no se puede castear directo a
@@ -72,6 +87,9 @@ class AppRouter {
 
         if (authState is AuthAuthenticated) {
           if (isPublic) return _homeForRole(authState.user.role);
+          if (_routesWithExtra.contains(location) && state.extra == null) {
+            return _homeForRole(authState.user.role);
+          }
           return null;
         }
 

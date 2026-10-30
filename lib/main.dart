@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bonvo/config/routes/app_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
-import 'package:bonvo/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/loyalty/presentation/request_status_notifier.dart';
@@ -49,13 +48,7 @@ Future<void> main() async {
   await configureDependencies();
 
   if (_firebaseReady) {
-    // No se recuerda la sesión: cada vez que se abre la app (o se recarga
-    // la página en web) hay que iniciar sesión de nuevo.
-    try {
-      await getIt<AuthRemoteDataSource>().logout();
-    } catch (e) {
-      debugPrint('⚠️  No se pudo cerrar la sesión previa: $e');
-    }
+    // La sesión se recuerda: solo se cierra con "Cerrar sesión".
     getIt<AuthBloc>().add(const AuthStarted());
   }
 
