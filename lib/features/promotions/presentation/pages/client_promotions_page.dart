@@ -9,6 +9,7 @@ import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart
 import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
+import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
 import 'package:bonvo/injection/injection.dart';
 
 class ClientPromotionsPage extends StatefulWidget {
@@ -96,9 +97,6 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
                 canAfford: userPoints >= p.pointsCost,
                 isRedeemed: isRedeemed,
                 userPoints: userPoints,
-                gradientIndex: p.businessId.isNotEmpty
-                    ? p.businessId.codeUnitAt(0) % 4
-                    : i % 4,
                 onRedeem: (!isRedeemed && userId.isNotEmpty)
                     ? () => _redeem(p, userId, userPoints)
                     : null,
@@ -328,7 +326,6 @@ class _PromoCard extends StatelessWidget {
   final bool canAfford;
   final bool isRedeemed;
   final int userPoints;
-  final int gradientIndex;
   final VoidCallback? onRedeem;
 
   const _PromoCard({
@@ -336,210 +333,53 @@ class _PromoCard extends StatelessWidget {
     required this.canAfford,
     required this.isRedeemed,
     required this.userPoints,
-    required this.gradientIndex,
     this.onRedeem,
   });
 
-  static const _gradients = [
-    LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF9B6BFF), Color(0xFF5B21B6)],
-    ),
-    LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF2A2A27), Color(0xFF0F0F0E)],
-    ),
-    LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)],
-    ),
-    LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF5B21B6), Color(0xFF5B21B6)],
-    ),
-  ];
-
-  static const _icons = <IconData>[
-    AppIcons.cafe,
-    AppIcons.percent,
-    AppIcons.gift,
-    AppIcons.restaurant,
-  ];
-
-  String _validUntil(DateTime createdAt) {
-    final expiry = createdAt.add(const Duration(days: 30));
-    const months = [
-      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
-    ];
-    return 'Válido hasta ${expiry.day} ${months[expiry.month - 1]}';
-  }
-
-  String _formatPts(int pts) {
-    if (pts >= 1000) {
-      return '${pts ~/ 1000},${(pts % 1000).toString().padLeft(3, '0')} pts';
+  @override
+  Widget build(BuildContext context) {
+    final lacking = promo.pointsCost - userPoints;
+    final Widget footer;
+    if (isRedeemed) {
+      footer = const _FooterNote(
+          icon: AppIcons.check, text: 'Promoción canjeada');
+    } else if (promo.pointsCost == 0 || canAfford) {
+      footer = FilledButton(
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+        onPressed: onRedeem,
+        child: Text(promo.pointsCost == 0 ? 'Ver en la tienda' : 'Canjear'),
+      );
+    } else {
+      footer = _FooterNote(icon: AppIcons.star, text: 'Te faltan $lacking pts');
     }
-    return '$pts pts';
+    return PromotionCard(promo: promo, showBusiness: true, footer: footer);
   }
+}
+
+class _FooterNote extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _FooterNote({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    final idx = gradientIndex % 4;
-    final gradient = _gradients[idx];
-    final icon = _icons[idx];
-    final lacking = promo.pointsCost - userPoints;
-
     return Container(
+      height: 44,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.cardLg),
-        boxShadow: AppShadows.card,
+        color: AppColors.amberTint,
+        borderRadius: BorderRadius.circular(AppRadius.button),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // ── Banner superior ──
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-            decoration: BoxDecoration(gradient: gradient),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 26),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _formatPts(promo.pointsCost),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Contenido blanco ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  promo.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${promo.businessName} · ${_validUntil(promo.createdAt)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                if (isRedeemed)
-                  Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F3EE),
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(AppIcons.check,
-                            size: 16, color: AppColors.textMuted),
-                        SizedBox(width: 6),
-                        Text(
-                          'Promoción canjeada',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (canAfford)
-                  GestureDetector(
-                    onTap: onRedeem,
-                    child: Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.gradient,
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                        boxShadow: AppShadows.button,
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'Canjear',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.amberTint,
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(AppIcons.star,
-                            size: 16, color: AppColors.amberText),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Te faltan $lacking pts',
-                          style: const TextStyle(
-                            color: AppColors.amberText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(text,
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
     );

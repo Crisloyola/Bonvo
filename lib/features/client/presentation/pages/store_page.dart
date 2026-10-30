@@ -19,6 +19,7 @@ import 'package:bonvo/features/loyalty/presentation/widgets/loyalty_widgets.dart
 import 'package:bonvo/features/points/domain/usecases/enroll_in_business.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
+import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
 import 'package:bonvo/injection/injection.dart';
 
 /// Tienda vista por el cliente: se llega escaneando su QR o desde
@@ -375,7 +376,7 @@ class _StorePageState extends State<StorePage> {
         const _Title('Regalos por puntos'),
         const SizedBox(height: 10),
         ResponsiveWrapGrid(
-          minItemWidth: wide ? 260 : 150,
+          minItemWidth: 260,
           children: [
             for (final r in rewards)
               _RewardCard(
@@ -395,16 +396,11 @@ class _StorePageState extends State<StorePage> {
       if (offers.isNotEmpty) ...[
         const _Title('Promociones'),
         const SizedBox(height: 10),
-        for (final o in offers)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _Section(
-              title: o.title,
-              child: Text(o.description,
-                  style: const TextStyle(color: AppColors.textSecondary)),
-            ),
-          ),
-        const SizedBox(height: 12),
+        ResponsiveWrapGrid(
+          minItemWidth: 260,
+          children: [for (final o in offers) PromotionCard(promo: o)],
+        ),
+        const SizedBox(height: 20),
       ],
 
       // ── Mis solicitudes ──
@@ -606,66 +602,24 @@ class _RewardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: 4 / 3,
-            child: promo.imageBase64 != null
-                ? Image.memory(base64Decode(promo.imageBase64!),
-                    fit: BoxFit.cover)
-                : Container(
-                    color: AppColors.greenTint,
-                    child: const Icon(Icons.card_giftcard_rounded,
-                        color: AppColors.primary, size: 40),
-                  ),
+    return PromotionCard(
+      promo: promo,
+      footer: SizedBox(
+        height: 40,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 40),
+            padding: EdgeInsets.zero,
+            textStyle:
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(promo.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text('${promo.pointsCost} pts',
-                    style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 38,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      padding: EdgeInsets.zero,
-                      textStyle: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                    onPressed: canRedeem ? onRedeem : null,
-                    child: Text(pendingThis
-                        ? 'Pedido'
-                        : canRedeem
-                            ? 'Canjear'
-                            : 'Te faltan $missing pts'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          onPressed: canRedeem ? onRedeem : null,
+          child: Text(pendingThis
+              ? 'Pedido · espera la entrega'
+              : canRedeem
+                  ? 'Canjear'
+                  : 'Te faltan $missing pts'),
+        ),
       ),
     );
   }

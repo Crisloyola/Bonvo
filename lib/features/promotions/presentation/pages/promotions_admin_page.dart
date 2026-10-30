@@ -5,6 +5,7 @@ import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/business/presentation/widgets/business_web_shell.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
+import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
 import 'package:bonvo/injection/injection.dart';
 
 class PromotionsAdminPage extends StatefulWidget {
@@ -42,56 +43,44 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage> {
     setState(() => _loading = false);
   }
 
+  Future<void> _delete(Promotion p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Eliminar promoción'),
+        content: Text('¿Eliminar "${p.title}"? No se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.error,
+                minimumSize: const Size(0, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final repo = getIt<PromotionsRepository>();
+    await repo.togglePromotion(widget.businessId, p.id, false);
+    await repo.deletePromotion(widget.businessId, p.id);
+    _load();
+  }
+
   Widget _itemFor(Promotion p) {
-    return Dismissible(
-      key: Key(p.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: AppColors.error,
-          borderRadius:
-              BorderRadius.circular(AppRadius.card),
-        ),
-        child: const Icon(AppIcons.delete,
-            color: Colors.white),
-      ),
-      confirmDismiss: (_) => showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)),
-          title: const Text('Eliminar promoción'),
-          content: Text(
-              '¿Eliminar "${p.title}"? No se puede deshacer.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.error),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Eliminar'),
-            ),
-          ],
-        ),
-      ),
-      onDismissed: (_) async {
-        final repo = getIt<PromotionsRepository>();
-        await repo.togglePromotion(
-            widget.businessId, p.id, false);
-        await repo.deletePromotion(
-            widget.businessId, p.id);
-        _load();
-      },
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
       child: _PromoAdminCard(
         promo: p,
         businessId: widget.businessId,
         onToggle: _load,
+        onDelete: () => _delete(p),
       ),
     );
   }
@@ -177,7 +166,7 @@ class _PromotionsAdminPageState extends State<PromotionsAdminPage> {
               sliver: SliverToBoxAdapter(
                 // _PromoAdminCard ya trae su margen inferior
                 child: ResponsiveWrapGrid(
-                  minItemWidth: 380,
+                  minItemWidth: 300,
                   runSpacing: 0,
                   children: _promotions.map(_itemFor).toList(),
                 ),
@@ -211,96 +200,46 @@ class _PromoAdminCard extends StatelessWidget {
   final Promotion promo;
   final String businessId;
   final VoidCallback onToggle;
+  final VoidCallback onDelete;
 
   const _PromoAdminCard({
     required this.promo,
     required this.businessId,
     required this.onToggle,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final iconColor =
-        promo.isFree ? AppColors.primary : AppColors.amberText;
-    final iconBg = promo.isFree ? AppColors.greenTint : AppColors.amberTint;
-    final iconData =
-        promo.isFree ? AppIcons.gift : AppIcons.star;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: promo.active ? AppColors.surface : const Color(0xFFF3F3EE),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(
-            color: promo.active ? AppColors.border : const Color(0xFFDCDCD6)),
-        boxShadow: promo.active ? AppShadows.card : [],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: promo.active ? iconBg : const Color(0xFFF3F3EE),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(iconData,
-                  color: promo.active ? iconColor : AppColors.textMuted,
-                  size: 22),
+    return PromotionCard(
+      promo: promo,
+      dimmed: !promo.active,
+      footer: Row(
+        children: [
+          Text(
+            promo.active ? 'Visible para clientes' : 'Oculta',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: promo.active ? AppColors.primary : AppColors.textMuted,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    promo.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: promo.active
-                          ? AppColors.textPrimary
-                          : AppColors.textMuted,
-                    ),
-                  ),
-                  if (promo.description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(promo.description,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    promo.isFree
-                        ? 'Promoción gratuita'
-                        : 'Canjeable por ${promo.pointsCost} pts',
-                    style: TextStyle(
-                      color: promo.isFree
-                          ? AppColors.primary
-                          : AppColors.amberText,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: promo.active,
-              activeThumbColor: AppColors.primary,
-              onChanged: (v) async {
-                await getIt<PromotionsRepository>()
-                    .togglePromotion(businessId, promo.id, v);
-                onToggle();
-              },
-            ),
-          ],
-        ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Eliminar',
+            onPressed: onDelete,
+            icon: const Icon(AppIcons.delete, color: AppColors.error),
+          ),
+          Switch(
+            value: promo.active,
+            activeThumbColor: AppColors.primary,
+            onChanged: (v) async {
+              await getIt<PromotionsRepository>()
+                  .togglePromotion(businessId, promo.id, v);
+              onToggle();
+            },
+          ),
+        ],
       ),
     );
   }

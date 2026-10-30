@@ -110,10 +110,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthUserRefreshRequested event,
     Emitter<AuthState> emit,
   ) async {
-    emit(const AuthLoading());
+    // Refresco en segundo plano: no pasa por AuthLoading (las pantallas
+    // abiertas quedarían en blanco) y si falla se conserva la sesión actual.
     final result = await _repository.refreshCurrentUser();
     result.fold(
-      (failure) => emit(AuthError(failure.message)),
+      (_) {},
       (user) => emit(AuthAuthenticated(user)),
     );
   }

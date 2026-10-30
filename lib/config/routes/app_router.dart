@@ -29,6 +29,16 @@ import 'package:bonvo/features/promotions/presentation/pages/promotions_admin_pa
 
 const _publicRoutes = ['/login', '/register', '/onboarding'];
 
+/// Datos pasados entre pantallas (`extra`). En web go_router los guarda en el
+/// historial del navegador y al reconstruir la ruta vuelven como
+/// Map<String, dynamic>, así que no se puede castear directo a
+/// Map<String, String>.
+Map<String, String> _extraMap(GoRouterState state) {
+  final raw = state.extra;
+  if (raw is! Map) return const {};
+  return raw.map((k, v) => MapEntry('$k', '$v'));
+}
+
 /// GoRoute cuya página se envuelve en [ResponsiveFrame]: en pantallas anchas
 /// se muestra como columna centrada, salvo las rutas con diseño de escritorio.
 GoRoute _route({
@@ -102,7 +112,7 @@ class AppRouter {
           path: '/client/qr',
           name: 'clientQr',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return QrFullscreenPage(
               userId: extra['userId']!,
               userName: extra['userName']!,
@@ -113,7 +123,7 @@ class AppRouter {
           path: '/client/history',
           name: 'clientHistory',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return TransactionHistoryPage(userId: extra['userId']!);
           },
         ),
@@ -126,7 +136,7 @@ class AppRouter {
           path: '/client/store',
           name: 'clientStore',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return StorePage(businessId: extra['businessId']!);
           },
         ),
@@ -146,7 +156,7 @@ class AppRouter {
           path: '/business/requests',
           name: 'businessRequests',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return BusinessRequestsPage(
               businessId: extra['businessId']!,
               businessName: extra['businessName'] ?? '',
@@ -157,7 +167,7 @@ class AppRouter {
           path: '/business/programs',
           name: 'businessPrograms',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return BusinessProgramsPage(
               businessId: extra['businessId']!,
               businessName: extra['businessName'] ?? '',
@@ -168,7 +178,7 @@ class AppRouter {
           path: '/business/clients',
           name: 'businessClients',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return ClientListPage(
               businessId: extra['businessId']!,
               businessName: extra['businessName'] ?? '',
@@ -181,7 +191,7 @@ class AppRouter {
           path: '/business/promotions',
           name: 'businessPromotions',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return PromotionsAdminPage(
               businessId: extra['businessId']!,
               businessName: extra['businessName']!,
@@ -192,7 +202,7 @@ class AppRouter {
           path: '/business/create-promotion',
           name: 'createPromotion',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return CreatePromotionPage(
               businessId: extra['businessId']!,
               businessName: extra['businessName']!,
@@ -205,7 +215,9 @@ class AppRouter {
           path: '/client/promotions',
           name: 'clientPromotions',
           builder: (context, state) {
-            final extra = List<String>.from(state.extra as List);
+            final extra = [
+              for (final e in (state.extra as List?) ?? const []) '$e',
+            ];
             return ClientPromotionsPage(businessIds: extra);
           },
         ),
@@ -231,7 +243,7 @@ class AppRouter {
           path: '/employee/accredit',
           name: 'employeeAccredit',
           builder: (context, state) {
-            final extra = state.extra as Map<String, String>;
+            final extra = _extraMap(state);
             return PointsAccreditationPage(
               clientUserId: extra['userId']!,
               homeRoute: extra['homeRoute'] ?? '/employee/home',

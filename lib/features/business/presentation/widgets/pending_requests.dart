@@ -157,67 +157,86 @@ class _RequestCard extends StatelessWidget {
             color: isRedeem ? AppColors.greenBorder : AppColors.border),
         boxShadow: AppShadows.card,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            radius: 21,
-            backgroundColor:
-                isRedeem ? AppColors.primary : AppColors.textPrimary,
-            child: Icon(
-              isRedeem ? Icons.card_giftcard_rounded : Icons.receipt_long,
-              color: Colors.white,
-              size: 20,
-            ),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 21,
+                backgroundColor:
+                    isRedeem ? AppColors.primary : AppColors.textPrimary,
+                child: Icon(
+                  isRedeem ? Icons.card_giftcard_rounded : Icons.receipt_long,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary)),
+                    Text(describeRequest(request),
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 13)),
+                    if (preview.isNotEmpty)
+                      Text(preview,
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                    Text(_ago(request.createdAt),
+                        style: const TextStyle(
+                            color: AppColors.textMuted, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          // Botones con ícono y texto para que no se confundan
+          if (busy)
+            const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary)),
-                Text(describeRequest(request),
-                    style: const TextStyle(
-                        color: AppColors.textPrimary, fontSize: 13)),
-                if (preview.isNotEmpty)
-                  Text(preview,
-                      style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700)),
-                Text(_ago(request.createdAt),
-                    style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 11)),
+                OutlinedButton.icon(
+                  onPressed: onReject,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    minimumSize: const Size(0, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button)),
+                  ),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text('Rechazar',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: onApprove,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 42),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: Text(isRedeem ? 'Entregar' : 'Aprobar'),
+                ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          if (busy)
-            const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2))
-          else ...[
-            IconButton(
-              tooltip: 'Rechazar',
-              onPressed: onReject,
-              style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFFFDECEC),
-              ),
-              icon: const Icon(Icons.close_rounded, color: AppColors.error),
-            ),
-            const SizedBox(width: 6),
-            IconButton(
-              tooltip: 'Aprobar',
-              onPressed: onApprove,
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              icon: const Icon(Icons.check_rounded, color: Colors.white),
-            ),
-          ],
         ],
       ),
     );
@@ -247,8 +266,7 @@ class _Empty extends StatelessWidget {
       ),
       child: Text(text,
           textAlign: TextAlign.center,
-          style:
-              const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
     );
   }
 }

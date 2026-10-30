@@ -7,6 +7,7 @@ import 'package:bonvo/core/services/storage_service.dart';
 import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
+import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
 import 'package:bonvo/injection/injection.dart';
 
 class CreatePromotionPage extends StatefulWidget {
@@ -193,7 +194,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Banner
-                  const _SectionLabel('Imagen del banner'),
+                  const _SectionLabel('Foto del premio o promoción'),
                   const SizedBox(height: 8),
                   _BannerUploader(
                     base64: _bannerBase64,
@@ -208,6 +209,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _titleCtrl,
+                    onChanged: (_) => setState(() {}),
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       hintText: 'Ej: Café americano gratis',
@@ -223,6 +225,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _descCtrl,
+                    onChanged: (_) => setState(() {}),
                     maxLines: 3,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
@@ -241,12 +244,12 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                   const SizedBox(height: 8),
                   _PointsSelector(
                     value: _pointsCost,
-                    onDecrement: _pointsCost >= 50
+                    onDecrement: _pointsCost >= 10
                         ? () =>
-                            setState(() => _pointsCost -= 50)
+                            setState(() => _pointsCost -= 10)
                         : null,
                     onIncrement: () =>
-                        setState(() => _pointsCost += 50),
+                        setState(() => _pointsCost += 10),
                   ),
 
                   const SizedBox(height: 16),
@@ -256,6 +259,31 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                     clientCount: _clientCount,
                     value: _sendPush,
                     onChanged: (v) => setState(() => _sendPush = v),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Vista previa: exactamente lo que verá el cliente
+                  const _SectionLabel('Así la verán tus clientes'),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: PromotionCard(
+                        promo: Promotion(
+                          id: '',
+                          businessId: widget.businessId,
+                          businessName: widget.businessName,
+                          title: _titleCtrl.text.trim(),
+                          description: _descCtrl.text.trim(),
+                          pointsCost: _pointsCost,
+                          active: true,
+                          createdAt: DateTime.now(),
+                          imageBase64: _bannerBase64,
+                        ),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 28),

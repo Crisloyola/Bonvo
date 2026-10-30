@@ -22,6 +22,7 @@ import 'package:bonvo/features/client/presentation/widgets/loyalty_card_widget.d
 import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
+import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
 import 'package:bonvo/injection/injection.dart';
 
 class ClientHomePage extends StatefulWidget {
@@ -811,114 +812,18 @@ class _PromosPreviewState extends State<_PromosPreview> {
             ),
           );
         }
-        return Column(
-          children: promos
-              .take(3)
-              .map((p) => _PromoCard(promo: p))
-              .toList(),
+        return ResponsiveWrapGrid(
+          minItemWidth: 240,
+          children: [
+            for (final p in promos.take(4))
+              GestureDetector(
+                onTap: () => context
+                    .push('/client/store', extra: {'businessId': p.businessId}),
+                child: PromotionCard(promo: p, showBusiness: true),
+              ),
+          ],
         );
       },
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────
-class _PromoCard extends StatelessWidget {
-  final Promotion promo;
-  const _PromoCard({required this.promo});
-
-  static const _iconColors = [
-    Color(0xFF2A2A27),
-    AppColors.primary,
-    Color(0xFF7C3AED),
-    Color(0xFF5B21B6),
-  ];
-  static const _bgColors = [
-    Color(0xFFECECEC),
-    AppColors.greenTint,
-    Color(0xFFEDE5FF),
-    Color(0xFFEDE5FF),
-  ];
-  static const _icons = [
-    Icons.local_cafe_rounded,
-    Icons.card_giftcard_rounded,
-    Icons.local_offer_rounded,
-    Icons.restaurant_rounded,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final idx = promo.title.codeUnitAt(0) % _iconColors.length;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.card,
-      ),
-      child: Row(
-        children: [
-          // Ícono
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: _bgColors[idx],
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(_icons[idx], color: _iconColors[idx], size: 24),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  promo.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  promo.businessName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Badge pts
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.amberTint,
-              borderRadius: BorderRadius.circular(AppRadius.chip),
-            ),
-            child: Text(
-              '${promo.pointsCost} pts',
-              style: const TextStyle(
-                color: AppColors.amberText,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

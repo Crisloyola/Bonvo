@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -41,15 +42,24 @@ class _MisTiendasView extends StatefulWidget {
 
 class _MisTiendasViewState extends State<_MisTiendasView> {
   List<Business> _businesses = [];
-  Map<String, Membership> _members = {};
+  final Map<String, Membership> _members = {};
   Position? _position;
   String _search = '';
   bool _loading = true;
+  final List<StreamSubscription> _memberSubs = [];
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    for (final s in _memberSubs) {
+      s.cancel();
+    }
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -60,13 +70,21 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
       r.fold((_) {}, (b) => businesses.add(b));
     }
 
-    // 2. Saldos del cliente en cada tienda
-    final members = <String, Membership>{};
+    // 2. Saldos del cliente en cada tienda, EN VIVO: cuando la tienda
+    // aprueba una compra el saldo se actualiza sin salir de la pantalla.
     for (final b in businesses) {
-      final m = await getIt<LoyaltyRepository>()
+      _memberSubs.add(getIt<LoyaltyRepository>()
           .watchMembership(b.id, widget.user.uid)
-          .first;
-      if (m != null) members[b.id] = m;
+          .listen((m) {
+        if (!mounted) return;
+        setState(() {
+          if (m == null) {
+            _members.remove(b.id);
+          } else {
+            _members[b.id] = m;
+          }
+        });
+      }));
     }
 
     // 3. Posición GPS
@@ -87,7 +105,6 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
     if (mounted) {
       setState(() {
         _businesses = businesses;
-        _members = members;
         _position = pos;
         _loading = false;
       });

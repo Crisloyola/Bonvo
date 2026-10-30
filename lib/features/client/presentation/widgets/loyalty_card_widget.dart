@@ -33,11 +33,6 @@ class LoyaltyCardWidget extends StatelessWidget {
     return '$pts';
   }
 
-  String get _cashback {
-    final soles = points / 100.0;
-    return 'S/ ${soles.toStringAsFixed(2)}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -113,7 +108,7 @@ class LoyaltyCardWidget extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // ── Cashback chip ──
+                        // ── Aclaración: es el total de todas sus tiendas ──
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
@@ -124,12 +119,12 @@ class LoyaltyCardWidget extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.monetization_on_outlined,
+                              Icon(Icons.storefront_rounded,
                                   color: Colors.white.withValues(alpha: 0.9),
                                   size: 13),
                               const SizedBox(width: 4),
                               Text(
-                                'Cashback $_cashback',
+                                'Suma de todas tus tiendas',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 12,
