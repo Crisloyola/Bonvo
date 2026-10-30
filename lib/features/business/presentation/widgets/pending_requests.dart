@@ -116,12 +116,8 @@ class _PendingRequestsListState extends State<PendingRequestsList> {
   String _preview(LoyaltyRequest r) {
     final p = widget.programs;
     return switch (r.type) {
-      RequestType.purchase => [
-          if (p.pointsEnabled) '+${p.pointsFor(r.amountCents)} pts',
-          if (p.cashbackEnabled)
-            '+${formatSoles(p.cashbackFor(r.amountCents))} cashback',
-          if (p.stampsEnabled) '+1 sello',
-        ].join(' · '),
+      RequestType.purchase =>
+        p.earnFor(r.amountCents, only: r.program).describe(),
       RequestType.reward => 'Entregar regalo · −${r.rewardPoints} pts',
       RequestType.stampReward => 'Entregar regalo de la tarjeta de sellos',
     };

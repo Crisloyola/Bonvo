@@ -8,6 +8,7 @@ import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/auth/presentation/widgets/auth_split_layout.dart';
+import 'package:bonvo/features/auth/presentation/widgets/legal_dialog.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -243,7 +244,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                   recognizer: TapGestureRecognizer()
-                                    ..onTap = () {},
+                                    ..onTap = () =>
+                                        showLegalDialog(context, LegalDoc.terms),
                                 ),
                                 const TextSpan(text: ' y la '),
                                 TextSpan(
@@ -253,7 +255,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                   recognizer: TapGestureRecognizer()
-                                    ..onTap = () {},
+                                    ..onTap = () => showLegalDialog(
+                                        context, LegalDoc.privacy),
                                 ),
                               ],
                             ),

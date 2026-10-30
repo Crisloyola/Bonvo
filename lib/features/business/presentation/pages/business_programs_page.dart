@@ -188,18 +188,67 @@ class _BusinessProgramsPageState extends State<BusinessProgramsPage> {
                     _ProgramCard(
                       icon: AppIcons.star,
                       title: 'Puntos',
-                      subtitle: 'Puntos por cada sol de compra, canjeables '
+                      subtitle: 'Puntos según lo que compra, canjeables '
                           'por los regalos que publiques.',
                       enabled: p.pointsEnabled,
                       onToggle: (v) => setState(
                           () => _programs = p.copyWith(pointsEnabled: v)),
-                      child: _Stepper(
-                        label: 'Puntos por cada S/ 1',
-                        value: p.pointsPerSol,
-                        min: 1,
-                        max: 100,
-                        onChanged: (v) => setState(
-                            () => _programs = p.copyWith(pointsPerSol: v)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Stepper(
+                            label: 'Puntos que das',
+                            value: p.pointsPerSol,
+                            min: 1,
+                            max: 100,
+                            onChanged: (v) => setState(
+                                () => _programs = p.copyWith(pointsPerSol: v)),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('Por cada',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final soles in const [1, 5, 10, 20, 50, 100])
+                                ChoiceChip(
+                                  label: Text('S/ $soles'),
+                                  selected: p.pointsEverySoles == soles,
+                                  selectedColor: AppColors.primary,
+                                  labelStyle: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: p.pointsEverySoles == soles
+                                        ? Colors.white
+                                        : AppColors.textPrimary,
+                                  ),
+                                  showCheckmark: false,
+                                  onSelected: (_) => setState(() => _programs =
+                                      p.copyWith(pointsEverySoles: soles)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.greenTint,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.button),
+                            ),
+                            child: Text(
+                              '${p.pointsRule}.  Ej.: una compra de S/ 100 '
+                              'da ${p.pointsFor(10000)} pts',
+                              style: const TextStyle(
+                                  color: AppColors.primaryDeep,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 

@@ -1,6 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
+/// Programa al que el cliente elige sumar una compra.
+enum LoyaltyProgram {
+  stamps('Sello'),
+  cashback('Cashback'),
+  points('Puntos');
+
+  final String label;
+  const LoyaltyProgram(this.label);
+}
+
+/// Lo que gana el cliente con una compra aprobada.
+class Earning {
+  final int points;
+  final int cashbackCents;
+  final int stamps;
+  const Earning({this.points = 0, this.cashbackCents = 0, this.stamps = 0});
+
+  /// "+10 pts · +S/ 1.50 cashback · +1 sello"
+  String describe() => [
+        if (points > 0) '+$points pts',
+        if (cashbackCents > 0) '+${formatSoles(cashbackCents)} cashback',
+        if (stamps > 0) '+$stamps sello',
+      ].join(' · ');
+}
+
 /// Programas de fidelización que el negocio activa desde su panel.
 /// Puede combinar los tres. Se guarda en businesses/{id}.programs.
 class LoyaltyPrograms extends Equatable {
@@ -13,9 +38,11 @@ class LoyaltyPrograms extends Equatable {
   final bool cashbackEnabled;
   final double cashbackPercent;
 
-  // Puntos: por cada S/ 1 de compra
+  // Puntos: [pointsPerSol] puntos por cada S/ [pointsEverySoles] de compra
+  // (ej.: 2 pts por cada S/ 100). El nombre pointsPerSol es heredado.
   final bool pointsEnabled;
   final int pointsPerSol;
+  final int pointsEverySoles;
 
   const LoyaltyPrograms({
     this.stampsEnabled = false,
@@ -25,6 +52,7 @@ class LoyaltyPrograms extends Equatable {
     this.cashbackPercent = 2,
     this.pointsEnabled = true,
     this.pointsPerSol = 1,
+    this.pointsEverySoles = 1,
   });
 
   /// Negocios creados antes de los programas solo tenían `pointsPerSol`.
@@ -44,6 +72,7 @@ class LoyaltyPrograms extends Equatable {
       cashbackPercent: (cashback['percent'] as num?)?.toDouble() ?? 2,
       pointsEnabled: points['enabled'] as bool? ?? false,
       pointsPerSol: (points['perSol'] as num?)?.toInt() ?? legacyPointsPerSol,
+      pointsEverySoles: (points['everySoles'] as num?)?.toInt() ?? 1,
     );
   }
 
@@ -54,7 +83,11 @@ class LoyaltyPrograms extends Equatable {
           'reward': stampReward,
         },
         'cashback': {'enabled': cashbackEnabled, 'percent': cashbackPercent},
-        'points': {'enabled': pointsEnabled, 'perSol': pointsPerSol},
+        'points': {
+          'enabled': pointsEnabled,
+          'perSol': pointsPerSol,
+          'everySoles': pointsEverySoles,
+        },
       };
 
   bool get anyEnabled => stampsEnabled || cashbackEnabled || pointsEnabled;
@@ -62,11 +95,47 @@ class LoyaltyPrograms extends Equatable {
   /// Puntos y cashback se calculan sobre el monto; los sellos no lo necesitan.
   bool get needsAmount => cashbackEnabled || pointsEnabled;
 
-  int pointsFor(int amountCents) =>
-      pointsEnabled ? (amountCents / 100 * pointsPerSol).floor() : 0;
+  /// Solo cuentan los tramos completos: con 2 pts por cada S/ 100,
+  /// una compra de S/ 250 da 4 pts.
+  int pointsFor(int amountCents) => pointsEnabled
+      ? (amountCents ~/ (pointsEverySoles * 100)) * pointsPerSol
+      : 0;
+
+  /// "2 pts por cada S/ 100" · "1 pt por cada S/ 1"
+  String get pointsRule =>
+      '$pointsPerSol pt${pointsPerSol == 1 ? '' : 's'} por cada S/ $pointsEverySoles';
 
   int cashbackFor(int amountCents) =>
       cashbackEnabled ? (amountCents * cashbackPercent / 100).round() : 0;
+
+  /// Programas activos, en el orden en que se le ofrecen al cliente.
+  List<LoyaltyProgram> get enabledPrograms => [
+        if (stampsEnabled) LoyaltyProgram.stamps,
+        if (cashbackEnabled) LoyaltyProgram.cashback,
+        if (pointsEnabled) LoyaltyProgram.points,
+      ];
+
+  /// Lo que gana una compra. [only] es el programa que eligió el cliente;
+  /// null (solicitudes anteriores a la elección) suma todos los activos.
+  Earning earnFor(int amountCents, {LoyaltyProgram? only}) {
+    bool uses(LoyaltyProgram p) => only == null || only == p;
+    return Earning(
+      points: uses(LoyaltyProgram.points) ? pointsFor(amountCents) : 0,
+      cashbackCents:
+          uses(LoyaltyProgram.cashback) ? cashbackFor(amountCents) : 0,
+      stamps: uses(LoyaltyProgram.stamps) && stampsEnabled ? 1 : 0,
+    );
+  }
+
+  /// Descripción corta de cada programa para mostrar al elegir.
+  String describeProgram(LoyaltyProgram p) => switch (p) {
+        LoyaltyProgram.stamps => stampReward.isEmpty
+            ? '1 sello por visita · $stampsRequired para tu regalo'
+            : '1 sello por visita · $stampsRequired → $stampReward',
+        LoyaltyProgram.cashback =>
+          '${cashbackPercent == cashbackPercent.roundToDouble() ? cashbackPercent.toInt() : cashbackPercent}% de tu compra como saldo',
+        LoyaltyProgram.points => pointsRule,
+      };
 
   LoyaltyPrograms copyWith({
     bool? stampsEnabled,
@@ -76,6 +145,7 @@ class LoyaltyPrograms extends Equatable {
     double? cashbackPercent,
     bool? pointsEnabled,
     int? pointsPerSol,
+    int? pointsEverySoles,
   }) =>
       LoyaltyPrograms(
         stampsEnabled: stampsEnabled ?? this.stampsEnabled,
@@ -85,6 +155,7 @@ class LoyaltyPrograms extends Equatable {
         cashbackPercent: cashbackPercent ?? this.cashbackPercent,
         pointsEnabled: pointsEnabled ?? this.pointsEnabled,
         pointsPerSol: pointsPerSol ?? this.pointsPerSol,
+        pointsEverySoles: pointsEverySoles ?? this.pointsEverySoles,
       );
 
   @override
@@ -96,6 +167,7 @@ class LoyaltyPrograms extends Equatable {
         cashbackPercent,
         pointsEnabled,
         pointsPerSol,
+        pointsEverySoles,
       ];
 }
 
@@ -185,6 +257,9 @@ class LoyaltyRequest extends Equatable {
   final int earnedStamps;
   final int earnedCashbackCents;
 
+  /// Programa elegido por el cliente (null en solicitudes antiguas).
+  final LoyaltyProgram? program;
+
   const LoyaltyRequest({
     required this.id,
     required this.businessId,
@@ -201,6 +276,7 @@ class LoyaltyRequest extends Equatable {
     this.earnedPoints = 0,
     this.earnedStamps = 0,
     this.earnedCashbackCents = 0,
+    this.program,
   });
 
   factory LoyaltyRequest.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -228,6 +304,9 @@ class LoyaltyRequest extends Equatable {
       earnedPoints: (d['earnedPoints'] as num?)?.toInt() ?? 0,
       earnedStamps: (d['earnedStamps'] as num?)?.toInt() ?? 0,
       earnedCashbackCents: (d['earnedCashbackCents'] as num?)?.toInt() ?? 0,
+      program: LoyaltyProgram.values
+          .where((p) => p.name == d['program'])
+          .firstOrNull,
     );
   }
 

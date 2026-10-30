@@ -134,7 +134,7 @@ class _Brand extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Bonvo Business',
+                'Creatrix Business',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

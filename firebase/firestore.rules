@@ -134,6 +134,9 @@ service cloud.firestore {
           request.resource.data.userId == request.auth.uid &&
           request.resource.data.status == 'pending' &&
           request.resource.data.type in ['purchase', 'reward', 'stampReward'] &&
+          // Toda compra dice a qué programa suma (sello, cashback o puntos)
+          (request.resource.data.type != 'purchase' ||
+            request.resource.data.get('program', '') in ['stamps', 'cashback', 'points']) &&
           request.resource.data.get('amountCents', 0) is int &&
           request.resource.data.get('amountCents', 0) >= 0 &&
           request.resource.data.get('amountCents', 0) <= 100000000 &&

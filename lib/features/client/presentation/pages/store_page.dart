@@ -15,6 +15,7 @@ import 'package:bonvo/features/business/domain/repositories/business_repository.
 import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
 import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
 import 'package:bonvo/features/loyalty/domain/loyalty.dart';
+import 'package:bonvo/features/loyalty/presentation/request_status_notifier.dart';
 import 'package:bonvo/features/loyalty/presentation/widgets/loyalty_widgets.dart';
 import 'package:bonvo/features/points/domain/usecases/enroll_in_business.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
@@ -71,7 +72,8 @@ class _StorePageState extends State<StorePage> {
         (_) => _error = 'No encontramos esta tienda.',
         (b) => _business = b,
       );
-      _promos = promos.fold((_) => [], (l) => l.where((p) => p.active).toList());
+      _promos =
+          promos.fold((_) => [], (l) => l.where((p) => p.active).toList());
     });
   }
 
@@ -103,14 +105,19 @@ class _StorePageState extends State<StorePage> {
   }
 
   Future<void> _registerPurchase(AuthUser user, Business b) async {
-    int amountCents = 0;
-    if (b.programs.needsAmount) {
-      final cents = await showDialog<int>(
+    final options = b.programs.enabledPrograms;
+    var amountCents = 0;
+    LoyaltyProgram program;
+    if (options.length == 1 && options.first == LoyaltyProgram.stamps) {
+      // Solo tarjeta de sellos: es una visita, no hace falta preguntar nada
+      program = LoyaltyProgram.stamps;
+    } else {
+      final choice = await showDialog<(int, LoyaltyProgram)>(
         context: context,
-        builder: (_) => _AmountDialog(programs: b.programs),
+        builder: (_) => _PurchaseDialog(programs: b.programs),
       );
-      if (cents == null) return;
-      amountCents = cents;
+      if (choice == null) return;
+      (amountCents, program) = choice;
     }
     try {
       await _repo.requestPurchase(
@@ -119,6 +126,7 @@ class _StorePageState extends State<StorePage> {
         userId: user.uid,
         userName: user.name,
         amountCents: amountCents,
+        program: program,
       );
       _snack('Solicitud enviada. La tienda debe aprobarla.');
     } catch (e) {
@@ -126,15 +134,13 @@ class _StorePageState extends State<StorePage> {
     }
   }
 
-  Future<void> _redeemReward(
-      AuthUser user, Business b, Promotion p) async {
+  Future<void> _redeemReward(AuthUser user, Business b, Promotion p) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Canjear regalo',
             style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Text(
-            '¿Pedir "${p.title}" por ${p.pointsCost} pts?\n\n'
+        content: Text('¿Pedir "${p.title}" por ${p.pointsCost} pts?\n\n'
             'Los puntos se descuentan cuando la tienda te entregue el regalo.'),
         actions: [
           TextButton(
@@ -188,6 +194,7 @@ class _StorePageState extends State<StorePage> {
       builder: (context, state) {
         final user = state is AuthAuthenticated ? state.user : null;
         if (user == null) return const SizedBox.shrink();
+        getIt<RequestStatusNotifier>().start(user.uid, user.businessIds);
         final wide = context.isWide;
 
         Widget body;
@@ -284,8 +291,7 @@ class _StorePageState extends State<StorePage> {
       List<LoyaltyRequest> requests, bool wide) {
     final p = b.programs;
     final pending = requests.where((r) => r.isPending).toList();
-    final pendingPurchase =
-        pending.any((r) => r.type == RequestType.purchase);
+    final pendingPurchase = pending.any((r) => r.type == RequestType.purchase);
     final pendingStampReward =
         pending.any((r) => r.type == RequestType.stampReward);
     // Puntos apartados por canjes pendientes
@@ -348,12 +354,13 @@ class _StorePageState extends State<StorePage> {
       // ── Registrar compra ──
       if (p.anyEnabled) ...[
         FilledButton.icon(
-          onPressed:
-              pendingPurchase ? null : () => _registerPurchase(user, b),
+          onPressed: pendingPurchase ? null : () => _registerPurchase(user, b),
           icon: const Icon(Icons.receipt_long_rounded),
           label: Text(pendingPurchase
               ? 'Tienes una solicitud pendiente'
-              : (p.needsAmount ? 'Registrar mi compra' : 'Registrar mi visita')),
+              : (p.needsAmount
+                  ? 'Registrar mi compra'
+                  : 'Registrar mi visita')),
         ),
         const SizedBox(height: 6),
         Text(
@@ -416,17 +423,28 @@ class _StorePageState extends State<StorePage> {
 }
 
 // ──────────────────────────────────────────────────────────────
-class _AmountDialog extends StatefulWidget {
+/// Registrar compra: el cliente elige a qué programa sumarla
+/// (sello, cashback o puntos) y escribe el monto.
+class _PurchaseDialog extends StatefulWidget {
   final LoyaltyPrograms programs;
-  const _AmountDialog({required this.programs});
+  const _PurchaseDialog({required this.programs});
 
   @override
-  State<_AmountDialog> createState() => _AmountDialogState();
+  State<_PurchaseDialog> createState() => _PurchaseDialogState();
 }
 
-class _AmountDialogState extends State<_AmountDialog> {
+class _PurchaseDialogState extends State<_PurchaseDialog> {
   final _ctrl = TextEditingController();
   int _cents = 0;
+  LoyaltyProgram? _program;
+
+  @override
+  void initState() {
+    super.initState();
+    final options = widget.programs.enabledPrograms;
+    // Con una sola opción no hay nada que elegir
+    if (options.length == 1) _program = options.first;
+  }
 
   @override
   void dispose() {
@@ -439,45 +457,78 @@ class _AmountDialogState extends State<_AmountDialog> {
     setState(() => _cents = (value * 100).round());
   }
 
+  // El sello no depende del monto; puntos y cashback sí
+  bool get _amountRequired => _program != LoyaltyProgram.stamps;
+
+  bool get _canSend => _program != null && (!_amountRequired || _cents > 0);
+
+  static IconData _icon(LoyaltyProgram p) => switch (p) {
+        LoyaltyProgram.stamps => Icons.verified_outlined,
+        LoyaltyProgram.cashback => AppIcons.coins,
+        LoyaltyProgram.points => AppIcons.star,
+      };
+
   @override
   Widget build(BuildContext context) {
     final p = widget.programs;
-    final preview = [
-      if (p.pointsEnabled) '+${p.pointsFor(_cents)} pts',
-      if (p.cashbackEnabled) '+${formatSoles(p.cashbackFor(_cents))} cashback',
-      if (p.stampsEnabled) '+1 sello',
-    ].join(' · ');
+    final options = p.enabledPrograms;
+    final preview =
+        _program == null ? '' : p.earnFor(_cents, only: _program).describe();
 
     return AlertDialog(
       title: const Text('Registrar compra',
           style: TextStyle(fontWeight: FontWeight.w800)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('¿Cuánto pagaste?',
-              style: TextStyle(color: AppColors.textSecondary)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (options.length > 1) ...[
+              const Text('¿Qué quieres sumar con esta compra?',
+                  style: TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 10),
+              for (final o in options)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ProgramOption(
+                    icon: _icon(o),
+                    title: o.label,
+                    subtitle: p.describeProgram(o),
+                    selected: _program == o,
+                    onTap: () => setState(() => _program = o),
+                  ),
+                ),
+              const SizedBox(height: 8),
             ],
-            onChanged: _onChanged,
-            decoration: const InputDecoration(
-              prefixText: 'S/ ',
-              hintText: '0.00',
+            Text(
+              _amountRequired
+                  ? '¿Cuánto pagaste?'
+                  : '¿Cuánto pagaste? (opcional)',
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
-          ),
-          if (_cents > 0) ...[
-            const SizedBox(height: 12),
-            Text('Si la tienda aprueba: $preview',
-                style: const TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _ctrl,
+              autofocus: options.length == 1,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+              ],
+              onChanged: _onChanged,
+              decoration: const InputDecoration(
+                prefixText: 'S/ ',
+                hintText: '0.00',
+              ),
+            ),
+            if (preview.isNotEmpty && _canSend) ...[
+              const SizedBox(height: 12),
+              Text('Si la tienda aprueba: $preview',
+                  style: const TextStyle(
+                      color: AppColors.primary, fontWeight: FontWeight.w700)),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -485,10 +536,86 @@ class _AmountDialogState extends State<_AmountDialog> {
             child: const Text('Cancelar')),
         FilledButton(
           style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-          onPressed: _cents > 0 ? () => Navigator.pop(context, _cents) : null,
+          onPressed: _canSend
+              ? () => Navigator.pop(context, (_cents, _program!))
+              : null,
           child: const Text('Enviar'),
         ),
       ],
+    );
+  }
+}
+
+class _ProgramOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ProgramOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.greenTint : AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.button),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : AppColors.amberTint,
+                  borderRadius: BorderRadius.circular(AppRadius.icon),
+                ),
+                child: Icon(icon,
+                    size: 20,
+                    color: selected ? Colors.white : AppColors.textSecondary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary)),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: selected ? AppColors.primary : AppColors.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

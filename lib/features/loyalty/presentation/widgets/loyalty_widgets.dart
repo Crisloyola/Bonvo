@@ -29,8 +29,7 @@ class ProgramList extends StatelessWidget {
         _ProgramRow(
           icon: AppIcons.star,
           title: 'Puntos',
-          subtitle:
-              '${programs.pointsPerSol} pt por cada S/ 1 · canjéalos por regalos',
+          subtitle: '${programs.pointsRule} · canjéalos por regalos',
         ),
     ];
     if (rows.isEmpty) {
@@ -202,7 +201,8 @@ class _Stamp extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: filled ? AppColors.primary : Colors.white.withValues(alpha: 0.06),
+        color:
+            filled ? AppColors.primary : Colors.white.withValues(alpha: 0.06),
         border: Border.all(
           color: filled
               ? AppColors.primaryLight
@@ -252,17 +252,20 @@ class RequestStatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: Text(label,
-          style: TextStyle(
-              color: fg, fontSize: 11, fontWeight: FontWeight.w700)),
+          style:
+              TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
 }
 
 /// Texto corto de lo que pide la solicitud ("Compra S/ 100.00", "Canje: ...").
 String describeRequest(LoyaltyRequest r) => switch (r.type) {
-      RequestType.purchase => r.amountCents > 0
-          ? 'Compra de ${formatSoles(r.amountCents)}'
-          : 'Visita',
+      RequestType.purchase => [
+          r.amountCents > 0
+              ? 'Compra de ${formatSoles(r.amountCents)}'
+              : 'Visita',
+          if (r.program != null) '→ ${r.program!.label}',
+        ].join(' '),
       RequestType.reward => 'Canje: ${r.rewardTitle} (${r.rewardPoints} pts)',
       RequestType.stampReward => 'Regalo de sellos: ${r.rewardTitle}',
     };

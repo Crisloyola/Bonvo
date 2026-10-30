@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
 import 'package:bonvo/core/utils/responsive.dart';
+import 'package:bonvo/core/widgets/profile_sheets.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
@@ -299,7 +300,7 @@ class _MisTiendasViewState extends State<_MisTiendasView> {
           '/client/promotions',
           extra: widget.user.businessIds,
         ),
-        onPerfil: () {},
+        onPerfil: () => showClientProfileSheet(context),
       ),
       body: body,
     );

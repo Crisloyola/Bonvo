@@ -11,15 +11,15 @@ import 'package:bonvo/core/services/notification_service.dart';
 import 'package:bonvo/core/services/proximity_service.dart';
 import 'package:bonvo/core/services/storage_service.dart';
 import 'package:bonvo/core/utils/responsive.dart';
+import 'package:bonvo/core/widgets/profile_sheets.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/business/domain/entities/business.dart';
 import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
 import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
-import 'package:bonvo/features/client/presentation/widgets/loyalty_card_widget.dart';
-import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
+import 'package:bonvo/features/client/presentation/widgets/store_cards_wallet.dart';
+import 'package:bonvo/features/loyalty/presentation/request_status_notifier.dart';
 import 'package:bonvo/features/promotions/domain/entities/promotion.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
 import 'package:bonvo/features/promotions/presentation/widgets/promotion_card.dart';
@@ -139,23 +139,26 @@ class _ClientHomePageState extends State<ClientHomePage> {
         _initNotifIfNeeded(user.businessIds);
         _startProximityIfNeeded(user.businessIds);
         _listenAnnouncements(user.businessIds);
+        getIt<RequestStatusNotifier>().start(user.uid, user.businessIds);
 
         final wide = context.isWide;
-        final qrExtra = {'userId': user.uid, 'userName': user.name};
 
-        // Tarjeta de fidelización
-        final card = StreamBuilder<int>(
-          stream: getIt<LoyaltyRepository>()
-              .watchTotalPoints(user.uid, user.businessIds),
-          initialData: 0,
-          builder: (context, snap) {
-            return LoyaltyCardWidget(
-              userId: user.uid,
-              userName: user.name,
-              points: snap.data ?? 0,
-              onTapQr: () => context.push('/client/qr', extra: qrExtra),
-            );
-          },
+        // Una tarjeta por cada tienda, con los saldos de esa tienda
+        final card = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Mis tarjetas',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            StoreCardsWallet(user: user, wide: wide),
+          ],
         );
 
         // ── 3 Accesos rápidos ──
@@ -329,56 +332,8 @@ class _ClientHomePageState extends State<ClientHomePage> {
     );
   }
 
-  void _showProfileSheet(BuildContext ctx) {
-    showModalBottomSheet<void>(
-      context: ctx,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.history_rounded,
-                  color: AppColors.primary),
-              title: const Text('Historial de puntos'),
-              onTap: () {
-                Navigator.pop(ctx);
-                final authState = ctx.read<AuthBloc>().state;
-                if (authState is AuthAuthenticated) {
-                  ctx.push('/client/history',
-                      extra: {'userId': authState.user.uid});
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout_rounded,
-                  color: AppColors.error),
-              title: const Text('Cerrar sesión',
-                  style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _proximity.stopMonitoring();
-                ctx.read<AuthBloc>().add(const AuthLogoutRequested());
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
+  void _showProfileSheet(BuildContext ctx) => showClientProfileSheet(ctx,
+      beforeLogout: _proximity.stopMonitoring);
 }
 
 // ──────────────────────────────────────────────────────────────

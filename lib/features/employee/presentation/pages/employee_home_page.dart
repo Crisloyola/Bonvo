@@ -53,7 +53,7 @@ class EmployeeHomePage extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Punto de venta · Bonvo',
+                                  'Punto de venta · Creatrix',
                                   style: TextStyle(
                                     color:
                                         Colors.white.withValues(alpha: 0.7),

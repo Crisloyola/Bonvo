@@ -127,7 +127,7 @@ class _Profile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Bonvo',
+                'Creatrix',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

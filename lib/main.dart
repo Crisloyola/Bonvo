@@ -10,6 +10,7 @@ import 'package:bonvo/config/themes/app_theme.dart';
 import 'package:bonvo/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
+import 'package:bonvo/features/loyalty/presentation/request_status_notifier.dart';
 import 'package:bonvo/firebase_options.dart';
 import 'package:bonvo/injection/injection.dart';
 
@@ -68,7 +69,7 @@ class LoyaltyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!_firebaseReady) {
       return MaterialApp(
-        title: 'Bonvo',
+        title: 'Creatrix',
         theme: AppTheme.lightTheme(),
         debugShowCheckedModeBanner: false,
         home: const _FirebaseSetupScreen(),
@@ -78,9 +79,10 @@ class LoyaltyApp extends StatelessWidget {
     return BlocProvider.value(
       value: getIt<AuthBloc>(),
       child: MaterialApp.router(
-        title: 'Bonvo',
+        title: 'Creatrix',
         theme: AppTheme.lightTheme(),
         routerConfig: getIt<AppRouter>().router,
+        scaffoldMessengerKey: rootMessengerKey,
         debugShowCheckedModeBanner: false,
       ),
     );

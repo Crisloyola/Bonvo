@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
 import 'package:bonvo/core/utils/responsive.dart';
+import 'package:bonvo/core/widgets/profile_sheets.dart';
 import 'package:bonvo/features/business/domain/entities/business.dart';
 import 'package:bonvo/features/business/domain/repositories/business_repository.dart';
 import 'package:bonvo/features/business/presentation/widgets/business_web_shell.dart';
@@ -251,7 +252,11 @@ class _ClientListPageState extends State<ClientListPage> {
           'businessId': widget.businessId,
           'businessName': widget.businessName,
         }),
-        onPerfil: () {},
+        onPerfil: () => showBusinessProfileSheet(
+          context,
+          businessId: widget.businessId,
+          businessName: widget.businessName,
+        ),
       ),
       body: body,
     );

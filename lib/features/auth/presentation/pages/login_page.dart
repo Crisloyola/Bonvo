@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/widgets/brand_logo.dart';
 import 'package:bonvo/core/utils/responsive.dart';
 import 'package:bonvo/features/auth/domain/entities/auth_user.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_event.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/auth/presentation/widgets/auth_split_layout.dart';
+import 'package:bonvo/features/auth/presentation/widgets/forgot_password_dialog.dart';
 import 'package:bonvo/features/auth/presentation/widgets/google_sign_in_button.dart';
 
 class LoginPage extends StatefulWidget {
@@ -77,20 +79,7 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(height: wide ? 0 : 52),
 
               // Logo en recuadro gradiente (en escritorio va en el panel)
-              if (!wide)
-                Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.gradient,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.local_offer_rounded,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
+              if (!wide) const CreatrixAppIcon(size: 62),
 
               if (!wide) const SizedBox(height: 24),
 
@@ -160,7 +149,8 @@ class _LoginPageState extends State<LoginPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () => showForgotPasswordDialog(context,
+                      initialEmail: _emailCtrl.text.trim()),
                   style: TextButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 0, vertical: 8),

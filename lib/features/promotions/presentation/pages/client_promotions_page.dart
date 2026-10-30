@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
 import 'package:bonvo/core/utils/responsive.dart';
+import 'package:bonvo/core/widgets/profile_sheets.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bonvo/features/auth/presentation/bloc/auth_state.dart';
 import 'package:bonvo/features/client/presentation/widgets/client_web_shell.dart';
@@ -250,7 +251,7 @@ class _ClientPromotionsPageState extends State<ClientPromotionsPage> {
               bottomNavigationBar: _BottomBar(
                 onInicio: () => context.go('/client/home'),
                 onTiendas: () => context.push('/client/tiendas'),
-                onPerfil: () {},
+                onPerfil: () => showClientProfileSheet(context),
               ),
               body: body,
             );

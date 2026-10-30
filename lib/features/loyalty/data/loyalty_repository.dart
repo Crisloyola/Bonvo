@@ -88,6 +88,7 @@ class LoyaltyRepository {
     required String userId,
     required String userName,
     required int amountCents,
+    LoyaltyProgram? program,
   }) =>
       _create(businessId, {
         'businessName': businessName,
@@ -95,6 +96,7 @@ class LoyaltyRepository {
         'userName': userName,
         'type': RequestType.purchase.name,
         'amountCents': amountCents,
+        if (program != null) 'program': program.name,
       });
 
   Future<void> requestReward({
@@ -198,12 +200,15 @@ class LoyaltyRepository {
 
           switch (request.type) {
             case RequestType.purchase:
-              final points = programs.pointsFor(request.amountCents);
-              final cashback = programs.cashbackFor(request.amountCents);
+              // Solo el programa que eligió el cliente (o todos si no eligió)
+              final earn =
+                  programs.earnFor(request.amountCents, only: request.program);
+              final points = earn.points;
+              final cashback = earn.cashbackCents;
               var stamps = m.stamps;
               var stampRewards = m.stampRewards;
               var earnedStamps = 0;
-              if (programs.stampsEnabled) {
+              if (earn.stamps > 0) {
                 earnedStamps = 1;
                 stamps += 1;
                 // Al completar la tarjeta se gana el regalo y se reinicia

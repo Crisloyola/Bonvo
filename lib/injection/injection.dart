@@ -28,6 +28,7 @@ import 'package:bonvo/features/points/domain/usecases/earn_points.dart';
 import 'package:bonvo/features/points/domain/usecases/enroll_in_business.dart';
 import 'package:bonvo/features/points/domain/usecases/get_user_transactions.dart';
 import 'package:bonvo/features/loyalty/data/loyalty_repository.dart';
+import 'package:bonvo/features/loyalty/presentation/request_status_notifier.dart';
 import 'package:bonvo/features/promotions/data/datasources/promotions_datasource.dart';
 import 'package:bonvo/features/promotions/data/repositories/promotions_repository_impl.dart';
 import 'package:bonvo/features/promotions/domain/repositories/promotions_repository.dart';
@@ -118,6 +119,10 @@ Future<void> configureDependencies() async {
   // --- Programas de fidelización, saldos y solicitudes ---
   getIt.registerLazySingleton<LoyaltyRepository>(
     () => LoyaltyRepository(getIt<FirebaseFirestore>()),
+  );
+
+  getIt.registerLazySingleton<RequestStatusNotifier>(
+    () => RequestStatusNotifier(),
   );
 
   // --- Promotions ---

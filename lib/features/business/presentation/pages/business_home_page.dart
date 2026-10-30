@@ -69,7 +69,7 @@ class _SetupPrompt extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text('Bonvo Business',
+                    const Text('Creatrix Business',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
@@ -874,7 +874,7 @@ class _ProgramsBanner extends StatelessWidget {
     final parts = [
       if (p.stampsEnabled) 'Sellos: ${p.stampsRequired} visitas',
       if (p.cashbackEnabled) 'Cashback ${formatPercent(p.cashbackPercent)}',
-      if (p.pointsEnabled) '${p.pointsPerSol} pt por S/ 1',
+      if (p.pointsEnabled) p.pointsRule,
     ];
     return Container(
       padding: const EdgeInsets.all(16),

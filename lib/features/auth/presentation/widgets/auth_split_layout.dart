@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bonvo/config/themes/app_theme.dart';
+import 'package:bonvo/core/widgets/brand_logo.dart';
 
 /// Diseño de escritorio para login y registro: marca a la izquierda,
 /// formulario centrado a la derecha.
@@ -39,34 +40,23 @@ class AuthBrandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: AppColors.gradient),
+      // Fondo oscuro como el Hero de Creatrix, con un brillo morado
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(-0.6, -0.4),
+          radius: 1.3,
+          colors: [Color(0xFF2E1A5C), Color(0xFF15131C), Color(0xFF0B0A10)],
+          stops: [0.0, 0.55, 1.0],
+        ),
+      ),
       padding: const EdgeInsets.all(56),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(Icons.local_offer_rounded,
-                    color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Bonvo',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
+          const CreatrixLogo(
+            height: 30,
+            textColor: Colors.white,
+            markColor: AppColors.primaryLight,
           ),
           const Spacer(),
           const Text(
@@ -98,7 +88,7 @@ class AuthBrandPanel extends StatelessWidget {
               icon: Icons.qr_code_2, text: 'Tarjeta de fidelidad en un QR'),
           const Spacer(),
           Text(
-            '© Bonvo',
+            '© Creatrix',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.6),
               fontSize: 12,
